@@ -1,0 +1,36 @@
+{
+  "data": {
+    "posts": {
+      "edges": [
+        {
+          "node": {
+            "id": "700001",
+            "name": "ShiftSwap",
+            "tagline": "Let hourly staff swap shifts without a group chat",
+            "description": "<p>Built for small restaurants.</p>",
+            "url": "https://www.producthunt.com/posts/shiftswap?utm_source=graphql",
+            "website": "https://www.producthunt.com/r/ABCDEF",
+            "votesCount": 410,
+            "commentsCount": 37,
+            "createdAt": "2026-09-29T07:01:00Z",
+            "topics": { "edges": [{ "node": { "name": "Productivity" } }, { "node": { "name": "SaaS" } }] }
+          }
+        },
+        {
+          "node": {
+            "id": "700002",
+            "name": "Quiet Launch",
+            "tagline": "Nobody voted for this",
+            "description": null,
+            "url": "https://www.producthunt.com/posts/quiet-launch",
+            "website": null,
+            "votesCount": 3,
+            "commentsCount": 0,
+            "createdAt": "2026-09-29T07:30:00Z",
+            "topics": { "edges": [] }
+          }
+        }
+      ]
+    }
+  }
+}

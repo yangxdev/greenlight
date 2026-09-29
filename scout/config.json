@@ -1,0 +1,83 @@
+{
+  "_comment": "Scout sources. Keys starting with _ are comments. Subreddit names go without r/. Tests validate this file.",
+  "userAgent": "greenlight-scout/0.1 (personal research bot; by /u/CHANGE_ME)",
+  "lookbackHours": 26,
+  "maxTextLength": 2000,
+  "retentionDays": 30,
+  "hn": {
+    "enabled": true,
+    "minPoints": 50,
+    "askMinPoints": 10,
+    "hitsPerPage": 100
+  },
+  "reddit": {
+    "_comment": "Pain-heavy communities by default. Swap in the ones where your compass.md users hang out.",
+    "enabled": true,
+    "subreddits": [
+      "SomebodyMakeThis",
+      "AppIdeas",
+      "SideProject",
+      "smallbusiness",
+      "Entrepreneur",
+      "freelance",
+      "webdev",
+      "SaaS",
+      "productivity",
+      "excel"
+    ],
+    "limit": 50,
+    "minScore": 10
+  },
+  "github": {
+    "enabled": true,
+    "minStars": 100,
+    "createdWithinDays": 7,
+    "perPage": 30
+  },
+  "producthunt": {
+    "enabled": true,
+    "limit": 30
+  },
+  "rss": {
+    "_comment": "Any RSS 2.0 / RSS 1.0 / Atom feed.",
+    "enabled": true,
+    "feeds": [
+      { "name": "Lobsters Ask", "url": "https://lobste.rs/t/ask.rss" }
+    ]
+  },
+  "painPhrases": [
+    "is there a tool",
+    "is there an app",
+    "is there any way",
+    "is there a way",
+    "does anyone know",
+    "any recommendations",
+    "looking for a tool",
+    "looking for an app",
+    "alternative to",
+    "i wish",
+    "why is there no",
+    "somebody make",
+    "someone should build",
+    "would pay",
+    "frustrat",
+    "annoying",
+    "tired of",
+    "hate that",
+    "pain in the",
+    "waste of time",
+    "manually",
+    "spreadsheet",
+    "struggling",
+    "how do you handle",
+    "how do you manage",
+    "what do you use for"
+  ],
+  "export": {
+    "_comment": "Caps what the Analyst reads each week; this is what costs Claude usage.",
+    "days": 7,
+    "limit": 150,
+    "maxSharePerSource": 0.4,
+    "maxTextLength": 600
+  }
+}

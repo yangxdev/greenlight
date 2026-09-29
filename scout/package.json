@@ -1,0 +1,31 @@
+{
+  "name": "greenlight-scout",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Greenlight Scout: pulls free internet signals into MongoDB. No AI.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "fetch": "node src/cli.ts fetch",
+    "export": "node src/cli.ts export",
+    "typecheck": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.11.2",
+    "mongodb": "^7.7.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.2"
+  }
+}

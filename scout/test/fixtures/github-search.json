@@ -1,0 +1,27 @@
+{
+  "total_count": 2,
+  "incomplete_results": false,
+  "items": [
+    {
+      "id": 880001,
+      "full_name": "someone/receipt-ocr",
+      "html_url": "https://github.com/someone/receipt-ocr",
+      "description": "Turn receipt photos into a spreadsheet &mdash; runs locally",
+      "stargazers_count": 1450,
+      "forks_count": 60,
+      "language": "TypeScript",
+      "topics": ["ocr", "receipts", "spreadsheet"],
+      "created_at": "2026-09-25T10:00:00Z"
+    },
+    {
+      "id": 880002,
+      "full_name": "other/cli-thing",
+      "html_url": "https://github.com/other/cli-thing",
+      "description": null,
+      "stargazers_count": 130,
+      "forks_count": 4,
+      "language": null,
+      "created_at": "2026-09-27T10:00:00Z"
+    }
+  ]
+}

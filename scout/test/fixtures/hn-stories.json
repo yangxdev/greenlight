@@ -1,0 +1,44 @@
+{
+  "hits": [
+    {
+      "objectID": "45100001",
+      "title": "Show HN: I built a tiny invoice generator for freelancers",
+      "url": "https://www.example.com/invoices/?utm_source=hn&ref=hn#top",
+      "story_text": null,
+      "author": "maker1",
+      "points": 212,
+      "num_comments": 87,
+      "created_at": "2026-09-29T08:15:00Z",
+      "created_at_i": 1790669700,
+      "_tags": ["story", "author_maker1", "story_45100001", "show_hn"]
+    },
+    {
+      "objectID": "45100002",
+      "title": "Ask HN: How do you handle client glossaries as a translator?",
+      "url": null,
+      "story_text": "<p>I&#x27;m tired of keeping glossaries in a spreadsheet &amp; emailing them around.<p>Is there a tool that does this?",
+      "author": "lingo",
+      "points": 64,
+      "num_comments": 41,
+      "created_at": "2026-09-29T06:00:00Z",
+      "created_at_i": 1790661600,
+      "_tags": ["story", "author_lingo", "story_45100002", "ask_hn"]
+    },
+    {
+      "objectID": "45100003",
+      "title": null,
+      "url": "https://example.org/untitled",
+      "story_text": null,
+      "author": "ghost",
+      "points": 70,
+      "num_comments": 0,
+      "created_at": "2026-09-29T05:00:00Z",
+      "created_at_i": 1790658000,
+      "_tags": ["story", "author_ghost", "story_45100003"]
+    }
+  ],
+  "nbHits": 3,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 100
+}

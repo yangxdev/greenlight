@@ -1,0 +1,67 @@
+# Scout: pulls free internet signals into MongoDB once a day. No AI, no PAT.
+# Without the MONGODB_URI secret it still runs and uploads the signals as a JSONL artifact,
+# so a manual run is a cheap way to see what the sources return.
+name: Scout
+
+on:
+  schedule:
+    - cron: "41 5 * * *" # daily 05:41 UTC, off the hour to avoid the :00 queue
+  workflow_dispatch:
+    inputs:
+      sources:
+        description: Comma-separated subset (hn,reddit,github,producthunt,rss). Empty means all enabled.
+        required: false
+
+concurrency:
+  group: scout
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: scout
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scout/package-lock.json
+
+      - run: npm ci
+
+      - name: Fetch signals
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_DB: ${{ vars.MONGODB_DB || 'greenlight' }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCES: ${{ inputs.sources }}
+        run: |
+          args=(fetch)
+          if [ -n "$SOURCES" ]; then args+=(--sources "$SOURCES"); fi
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::notice::MONGODB_URI is not set, so signals go to a JSONL artifact instead of MongoDB"
+            args+=(--out "$RUNNER_TEMP/signals.jsonl")
+          fi
+          node src/cli.ts "${args[@]}"
+
+      - name: Upload signals (only when MongoDB is not configured)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: signals
+          path: ${{ runner.temp }}/signals.jsonl
+          if-no-files-found: ignore
+          retention-days: 7

@@ -1,0 +1,106 @@
+import { readFile } from 'node:fs/promises'
+import type { FeedConfig, ScoutConfig } from './types.ts'
+
+type Json = unknown
+
+class ConfigError extends Error {}
+
+function obj(value: Json, path: string): Record<string, Json> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new ConfigError(`${path} must be an object`)
+  return value as Record<string, Json>
+}
+
+function num(value: Json, path: string, min = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < min) throw new ConfigError(`${path} must be a number >= ${min}`)
+  return value
+}
+
+function bool(value: Json, path: string): boolean {
+  if (typeof value !== 'boolean') throw new ConfigError(`${path} must be true or false`)
+  return value
+}
+
+function str(value: Json, path: string): string {
+  if (typeof value !== 'string' || value.trim() === '') throw new ConfigError(`${path} must be a non-empty string`)
+  return value
+}
+
+function strings(value: Json, path: string): string[] {
+  if (!Array.isArray(value)) throw new ConfigError(`${path} must be an array of strings`)
+  return value.map((v, i) => str(v, `${path}[${i}]`))
+}
+
+function feeds(value: Json, path: string): FeedConfig[] {
+  if (!Array.isArray(value)) throw new ConfigError(`${path} must be an array`)
+  return value.map((v, i) => {
+    const feed = obj(v, `${path}[${i}]`)
+    const url = str(feed.url, `${path}[${i}].url`)
+    if (!/^https?:\/\//.test(url)) throw new ConfigError(`${path}[${i}].url must start with http(s)://`)
+    return { name: str(feed.name, `${path}[${i}].name`), url }
+  })
+}
+
+/** Validate parsed JSON into a ScoutConfig. Keys starting with "_" are comments and ignored. */
+export function parseConfig(raw: Json): ScoutConfig {
+  const c = obj(raw, 'config')
+  const hn = obj(c.hn, 'hn')
+  const reddit = obj(c.reddit, 'reddit')
+  const github = obj(c.github, 'github')
+  const producthunt = obj(c.producthunt, 'producthunt')
+  const rss = obj(c.rss, 'rss')
+  const exp = obj(c.export, 'export')
+
+  const subreddits = strings(reddit.subreddits, 'reddit.subreddits')
+  for (const sub of subreddits) {
+    if (!/^[A-Za-z0-9_]{2,21}$/.test(sub)) throw new ConfigError(`reddit.subreddits: "${sub}" is not a subreddit name (no "r/" prefix)`)
+  }
+  const maxShare = num(exp.maxSharePerSource, 'export.maxSharePerSource')
+  if (maxShare > 1) throw new ConfigError('export.maxSharePerSource must be between 0 and 1')
+
+  return {
+    userAgent: str(c.userAgent, 'userAgent'),
+    lookbackHours: num(c.lookbackHours, 'lookbackHours', 1),
+    maxTextLength: num(c.maxTextLength, 'maxTextLength', 100),
+    retentionDays: num(c.retentionDays, 'retentionDays', 1),
+    hn: {
+      enabled: bool(hn.enabled, 'hn.enabled'),
+      minPoints: num(hn.minPoints, 'hn.minPoints'),
+      askMinPoints: num(hn.askMinPoints, 'hn.askMinPoints'),
+      hitsPerPage: num(hn.hitsPerPage, 'hn.hitsPerPage', 1),
+    },
+    reddit: {
+      enabled: bool(reddit.enabled, 'reddit.enabled'),
+      subreddits,
+      limit: num(reddit.limit, 'reddit.limit', 1),
+      minScore: num(reddit.minScore, 'reddit.minScore'),
+    },
+    github: {
+      enabled: bool(github.enabled, 'github.enabled'),
+      minStars: num(github.minStars, 'github.minStars'),
+      createdWithinDays: num(github.createdWithinDays, 'github.createdWithinDays', 1),
+      perPage: num(github.perPage, 'github.perPage', 1),
+    },
+    producthunt: {
+      enabled: bool(producthunt.enabled, 'producthunt.enabled'),
+      limit: num(producthunt.limit, 'producthunt.limit', 1),
+    },
+    rss: { enabled: bool(rss.enabled, 'rss.enabled'), feeds: feeds(rss.feeds, 'rss.feeds') },
+    painPhrases: strings(c.painPhrases, 'painPhrases').map((p) => p.toLowerCase()),
+    export: {
+      days: num(exp.days, 'export.days', 1),
+      limit: num(exp.limit, 'export.limit', 1),
+      maxSharePerSource: maxShare,
+      maxTextLength: num(exp.maxTextLength, 'export.maxTextLength', 50),
+    },
+  }
+}
+
+export async function loadConfig(path: string): Promise<ScoutConfig> {
+  const text = await readFile(path, 'utf8')
+  try {
+    return parseConfig(JSON.parse(text))
+  } catch (error) {
+    if (error instanceof ConfigError || error instanceof SyntaxError) throw new Error(`${path}: ${error.message}`, { cause: error })
+    throw error
+  }
+}

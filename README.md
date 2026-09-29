@@ -22,7 +22,8 @@ The Analyst, Critic and Architect read it.
 |-------|--------|--------|
 | 1 | Board, Architect, Factory, product template | **built** |
 | 2 | Inspector, Factory fix loop, Publisher | **built** |
-| 3 | Scout, Analyst, Critic | roadmap (role prompts exist in `.claude/agents/`) |
+| 3 | Scout | **built** (daily fetch + ranked export) |
+| 3 | Analyst, Critic | roadmap (role prompts exist in `.claude/agents/`) |
 | 4 | Observer | roadmap (role prompt exists in `.claude/agents/`) |
 
 ## Label state machine
@@ -67,6 +68,10 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
   architect.yml             on label "approved"
   factory-dispatch.yml      on label "blueprint-ok"
   template-ci.yml           keeps template/ lint/test/build green
+  scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it)
+  scout-ci.yml              keeps scout/ typechecked, linted, tested
+scout/                      Scout: HN, Reddit, GitHub, Product Hunt, RSS fetchers + ranked export (see scout/README.md)
+  config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
   CLAUDE.md                 stack conventions, R2/Mongo usage, testing rules, definition of done
   src/ functions/ shared/   Vite + React + RTK + Tailwind + TS app, Pages Functions, shared types
@@ -197,6 +202,19 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 The Architect copies all four into each product repo it creates. Product repos created before you add a secret need it
 set by hand, or you can re-apply `approved` (the Architect reuses the existing repo and re-copies secrets).
 
+Scout secrets (all optional; the Scout runs without them):
+
+| Secret | Value | Without it |
+|--------|-------|------------|
+| `MONGODB_URI` | Atlas connection string (see below) | signals go to a JSONL artifact on each run instead of MongoDB |
+| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | reddit.com/prefs/apps → create a **script** app | anonymous requests, which Reddit often blocks from GitHub Actions |
+| `PRODUCTHUNT_TOKEN` | producthunt.com/v2/oauth/applications → developer token | public feed only, with no vote or comment counts |
+
+**MongoDB Atlas (free M0):** create an M0 cluster, add a database user limited to read/write on the `greenlight` database,
+and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Copy the `mongodb+srv://…` string into
+`MONGODB_URI`. The Scout creates its indexes itself, including a 30-day TTL, so the collection stays well under M0's
+512 MB.
+
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`private`|`public`, default `private`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
 `INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), and `CLAUDE_MODEL` (passed as `--model`;
@@ -224,18 +242,19 @@ so it's left out on purpose.
 
 ### 6. Fill in `compass.md`
 
-Replace the `TODO`s: interests, background and the no-go list.
+Replace the `TODO`s: interests, background and the no-go list. Then edit `scout/config.json`: set your Reddit
+username in `userAgent` and pick subreddits and feeds where your target users talk.
 
 ## Roadmap
 
-### Phase 3: Scout + Analyst + Critic
+### Phase 3: Analyst + Critic
 
-- `scout/`: plain TypeScript scripts, no AI, on a daily `schedule`. They pull the HN Algolia API, Reddit `.json`
-  listings, GitHub trending, the Product Hunt feed and RSS into a MongoDB Atlas `signals` collection, deduplicated by URL.
-- Weekly `analyst.yml`: exports recent signals to JSONL, runs Claude with `.claude/agents/analyst.md`, and commits
-  `analysis/<date>.md`.
-- `critic.yml` runs after that with `.claude/agents/critic.md`. A shell step files at most 3 issues with label `idea`
-  from `analysis/<date>-critic.md`.
+The Scout is built. `scout export` already produces the Analyst's input, which is ranked and capped at about 150
+signals (under ~30k tokens).
+- Weekly `analyst.yml`: a shell job runs `scout export` and uploads it as an artifact. An AI job with no PAT runs Claude
+  with `.claude/agents/analyst.md` and writes `analysis/<date>.md` as an artifact. A shell job commits it.
+- `critic.yml` runs after that with `.claude/agents/critic.md`, using the same job split. A shell step files at most 3
+  issues with label `idea` from `analysis/<date>-critic.md`, and never applies `approved`: that gate stays yours.
 
 ### Phase 4: Observer
 

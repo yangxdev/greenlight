@@ -1,0 +1,123 @@
+{
+  "kind": "Listing",
+  "data": {
+    "after": null,
+    "dist": 6,
+    "children": [
+      {
+        "kind": "t3",
+        "data": {
+          "id": "1ab001",
+          "name": "t3_1ab001",
+          "title": "Is there an app that reminds customers about unpaid invoices without sounding rude?",
+          "selftext": "I run a cleaning business. Chasing payments manually takes hours every week.",
+          "permalink": "/r/smallbusiness/comments/1ab001/is_there_an_app_that_reminds_customers/",
+          "url": "https://www.reddit.com/r/smallbusiness/comments/1ab001/is_there_an_app_that_reminds_customers/",
+          "score": 340,
+          "ups": 340,
+          "num_comments": 122,
+          "created_utc": 1790665000,
+          "subreddit": "smallbusiness",
+          "over_18": false,
+          "stickied": false,
+          "is_self": true
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "1ab002",
+          "name": "t3_1ab002",
+          "title": "Tiny invoice generator for freelancers (not mine, found it on HN)",
+          "selftext": "",
+          "permalink": "/r/smallbusiness/comments/1ab002/tiny_invoice_generator/",
+          "url": "https://example.com/invoices?utm_medium=social",
+          "score": 45,
+          "ups": 45,
+          "num_comments": 12,
+          "created_utc": 1790670000,
+          "subreddit": "smallbusiness",
+          "over_18": false,
+          "stickied": false,
+          "is_self": false
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "1ab003",
+          "name": "t3_1ab003",
+          "title": "Weekly promotion thread",
+          "selftext": "Promote your business here.",
+          "permalink": "/r/smallbusiness/comments/1ab003/weekly_promotion_thread/",
+          "url": "https://www.reddit.com/r/smallbusiness/comments/1ab003/weekly_promotion_thread/",
+          "score": 900,
+          "ups": 900,
+          "num_comments": 500,
+          "created_utc": 1790665000,
+          "subreddit": "smallbusiness",
+          "over_18": false,
+          "stickied": true,
+          "is_self": true
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "1ab004",
+          "name": "t3_1ab004",
+          "title": "Old post outside the lookback window",
+          "selftext": "",
+          "permalink": "/r/smallbusiness/comments/1ab004/old/",
+          "url": "https://www.reddit.com/r/smallbusiness/comments/1ab004/old/",
+          "score": 500,
+          "ups": 500,
+          "num_comments": 80,
+          "created_utc": 1790500000,
+          "subreddit": "smallbusiness",
+          "over_18": false,
+          "stickied": false,
+          "is_self": true
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "1ab005",
+          "name": "t3_1ab005",
+          "title": "NSFW post",
+          "selftext": "",
+          "permalink": "/r/smallbusiness/comments/1ab005/nsfw/",
+          "url": "https://www.reddit.com/r/smallbusiness/comments/1ab005/nsfw/",
+          "score": 200,
+          "ups": 200,
+          "num_comments": 20,
+          "created_utc": 1790665000,
+          "subreddit": "smallbusiness",
+          "over_18": true,
+          "stickied": false,
+          "is_self": true
+        }
+      },
+      {
+        "kind": "t3",
+        "data": {
+          "id": "1ab006",
+          "name": "t3_1ab006",
+          "title": "Low score post",
+          "selftext": "",
+          "permalink": "/r/smallbusiness/comments/1ab006/low/",
+          "url": "https://www.reddit.com/r/smallbusiness/comments/1ab006/low/",
+          "score": 3,
+          "ups": 3,
+          "num_comments": 1,
+          "created_utc": 1790665000,
+          "subreddit": "smallbusiness",
+          "over_18": false,
+          "stickied": false,
+          "is_self": true
+        }
+      }
+    ]
+  }
+}

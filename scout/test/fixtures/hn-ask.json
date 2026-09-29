@@ -1,0 +1,32 @@
+{
+  "hits": [
+    {
+      "objectID": "45100002",
+      "title": "Ask HN: How do you handle client glossaries as a translator?",
+      "url": null,
+      "story_text": "<p>I&#x27;m tired of keeping glossaries in a spreadsheet &amp; emailing them around.<p>Is there a tool that does this?",
+      "author": "lingo",
+      "points": 64,
+      "num_comments": 41,
+      "created_at": "2026-09-29T06:00:00Z",
+      "created_at_i": 1790661600,
+      "_tags": ["story", "author_lingo", "story_45100002", "ask_hn"]
+    },
+    {
+      "objectID": "45100004",
+      "title": "Ask HN: What do you use for tracking equipment loans at a makerspace?",
+      "url": null,
+      "story_text": "We use a paper sign-out sheet. It is annoying and things go missing.",
+      "author": "maker2",
+      "points": 12,
+      "num_comments": 9,
+      "created_at": "2026-09-28T22:30:00Z",
+      "created_at_i": 1790634600,
+      "_tags": ["story", "author_maker2", "story_45100004", "ask_hn"]
+    }
+  ],
+  "nbHits": 2,
+  "page": 0,
+  "nbPages": 1,
+  "hitsPerPage": 100
+}

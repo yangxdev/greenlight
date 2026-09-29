@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xml:lang="en-US" xmlns="http://www.w3.org/2005/Atom">
+  <id>tag:www.producthunt.com,2005:/feed</id>
+  <link rel="alternate" type="text/html" href="https://www.producthunt.com"/>
+  <link rel="self" type="application/atom+xml" href="https://www.producthunt.com/feed"/>
+  <title>Product Hunt — The best new products, every day</title>
+  <updated>2026-09-29T09:00:00-07:00</updated>
+  <entry>
+    <id>tag:www.producthunt.com,2005:Post/700001</id>
+    <published>2026-09-29T00:01:00-07:00</published>
+    <updated>2026-09-29T09:00:00-07:00</updated>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/products/shiftswap"/>
+    <title>ShiftSwap</title>
+    <content type="html">&lt;p&gt;
+      Let hourly staff swap shifts without a group chat
+    &lt;/p&gt;
+    &lt;p&gt;
+      &lt;a href="https://www.producthunt.com/products/shiftswap"&gt;Discussion&lt;/a&gt;
+      |
+      &lt;a href="https://www.producthunt.com/r/ABCDEF"&gt;Link&lt;/a&gt;
+    &lt;/p&gt;
+    </content>
+    <author>
+      <name>Jane Maker</name>
+    </author>
+  </entry>
+  <entry>
+    <id>tag:www.producthunt.com,2005:Post/690000</id>
+    <published>2026-09-20T00:01:00-07:00</published>
+    <updated>2026-09-20T09:00:00-07:00</updated>
+    <link rel="alternate" type="text/html" href="https://www.producthunt.com/products/old-thing"/>
+    <title>Old Thing</title>
+    <content type="html">&lt;p&gt;From last week&lt;/p&gt;</content>
+    <author>
+      <name>Old Maker</name>
+    </author>
+  </entry>
+</feed>

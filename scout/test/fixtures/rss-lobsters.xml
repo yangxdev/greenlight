@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:slash="http://purl.org/rss/1.0/modules/slash/">
+  <channel>
+    <title>Lobsters: ask</title>
+    <link>https://lobste.rs/t/ask</link>
+    <description>ask</description>
+    <item>
+      <title>How do you manage dotfiles across work &amp; personal machines?</title>
+      <link>https://lobste.rs/s/abc123/how_do_you_manage_dotfiles</link>
+      <guid isPermaLink="false">https://lobste.rs/s/abc123</guid>
+      <author>someone@users.lobste.rs (someone)</author>
+      <pubDate>Tue, 29 Sep 2026 07:12:00 -0000</pubDate>
+      <comments>https://lobste.rs/s/abc123/how_do_you_manage_dotfiles</comments>
+      <description><![CDATA[<p>I keep a git repo but <b>syncing secrets</b> is a pain in the neck.</p>]]></description>
+      <slash:comments>14</slash:comments>
+      <category>ask</category>
+    </item>
+    <item>
+      <title>Stale question</title>
+      <link>https://lobste.rs/s/old999/stale_question</link>
+      <guid isPermaLink="false">https://lobste.rs/s/old999</guid>
+      <pubDate>Mon, 21 Sep 2026 07:12:00 -0000</pubDate>
+      <description>Too old to matter.</description>
+    </item>
+  </channel>
+</rss>
