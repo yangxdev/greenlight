@@ -23,7 +23,7 @@ The Analyst, Critic and Architect read it.
 | 1 | Board, Architect, Factory, product template | **built** |
 | 2 | Inspector, Factory fix loop, Publisher | **built** |
 | 3 | Scout | **built** (daily fetch + ranked export) |
-| 3 | Analyst, Critic | roadmap (role prompts exist in `.claude/agents/`) |
+| 3 | Analyst, Critic | **built** (weekly `ideas.yml`) |
 | 4 | Observer | roadmap (role prompt exists in `.claude/agents/`) |
 
 ## Label state machine
@@ -43,7 +43,7 @@ any state ──🧑──► archived
 
 | Label | Set by | Meaning / what happens next |
 |-------|--------|-----------------------------|
-| `idea` | issue template (you) · Critic (phase 3) | Idea card waiting for review |
+| `idea` | issue template (you) · Critic (`ideas.yml`, weekly) | Idea card waiting for review |
 | `approved` | **you** | `architect.yml` creates the product repo, writes `blueprint.md`, comments the link |
 | `blueprint-ready` | Architect | Review/edit `blueprint.md` in the product repo |
 | `blueprint-ok` | **you** | `factory-dispatch.yml` checks nothing else is `building`, then triggers the product's Factory |
@@ -70,6 +70,8 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
   template-ci.yml           keeps template/ lint/test/build green
   scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it)
   scout-ci.yml              keeps scout/ typechecked, linted, tested
+  ideas.yml                 weekly: Analyst + Critic -> analysis/<date>*.md, at most 3 `idea` issues
+analysis/                   weekly idea cards and Critic verdicts, committed by ideas.yml
 scout/                      Scout: HN, Reddit, GitHub, Product Hunt, RSS fetchers + ranked export (see scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
@@ -88,9 +90,17 @@ folder costs nothing, and template changes land in the same PR as workflow chang
 In both setups, existing products don't receive later template changes. That's intended, because each product is a
 snapshot.
 
-## How it works (phases 1 and 2)
+## How it works
 
-1. **You** open an issue with the *Idea* form (label `idea`) and later add `approved`.
+0. **Scout** (`scout.yml`, daily, no AI) stores signals. **Ideas** (`ideas.yml`, Mondays):
+   - `export` (no AI) takes the ranked Scout export (about 150 signals) and the existing idea titles;
+   - the **Analyst** (AI, about 20 turns) writes idea cards to `analysis/<date>.md`;
+   - the **Critic** (AI, fresh context, about 15 turns) checks the cards' evidence against the signals and scores them
+     on the compass rubric. It writes `analysis/<date>-critic.md` and returns a JSON verdict;
+   - `publish` (no AI) commits `analysis/` and files at most `CRITIC_MAX_IDEAS` (3) issues scoring at least
+     `CRITIC_MIN_SCORE` (14/20), skipping titles that already exist and defusing @mentions.
+   It never adds `approved`, and bot-filed issues trigger nothing.
+1. **You** review the `idea` issues, or write your own with the *Idea* form, and add `approved` to the ones you want.
 2. **Architect** (`architect.yml`, about 20 turns max), in three jobs:
    - `scaffold` (no AI) creates `<you>/<slugified-title>` (private by default) from `template/`, replacing the
      `greenlight-product` placeholder with the repo name. It copies `CLAUDE_CODE_OAUTH_TOKEN`, `GREENLIGHT_TOKEN` and,
@@ -130,6 +140,8 @@ The Pro plan's usage limits are the real budget:
 - **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
   `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
   Worst case per product is about 1 Architect + 1 build + 4 reviews + 3 fixes.
+- **Weekly idea generation is two short runs:** the Analyst (about 20 turns over about 30k tokens of signals) and the
+  Critic (about 15 turns). With no Scout signals, both are skipped.
 - **The AI review only runs when deterministic checks pass.** A red check goes back to the Factory with the log, without
   spending a review.
 - **No AI in deterministic steps.** Repo creation, secrets, validation, checks, pushes, PRs and labels are all shell.
@@ -144,6 +156,7 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 
 | Workflow | AI / repo-code jobs (no PAT) | Credentialed jobs (no AI, no repo code) |
 |----------|------------------------------|-----------------------------------------|
+| Ideas | `analyst`, `critic` (artifacts + JSON verdict out) | `export` (MongoDB), `publish` (`GITHUB_TOKEN` only) |
 | Architect | `blueprint` (artifact out: blueprint.md) | `scaffold`, `publish` |
 | Factory | `agent` (git bundle out), `verify` | `prepare`, `publish` |
 | Inspector | `checks`, `review` (JSON verdict out) | `decide` |
@@ -217,7 +230,8 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`private`|`public`, default `private`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
-`INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), and `CLAUDE_MODEL` (passed as `--model`;
+`INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
+`CRITIC_MAX_TURNS` (15), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), and `CLAUDE_MODEL` (passed as `--model`;
 empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can
 override them there per product.
 
@@ -245,16 +259,15 @@ so it's left out on purpose.
 Replace the `TODO`s: interests, background and the no-go list. Then edit `scout/config.json`: set your Reddit
 username in `userAgent` and pick subreddits and feeds where your target users talk.
 
+### 7. First runs
+
+1. Actions → **Scout** → *Run workflow*. Without `MONGODB_URI` it uploads a `signals` artifact. Check that every
+   source returned something (the run summary has a table).
+2. Actions → **Ideas** → *Run workflow*. It works without MongoDB too, using a fresh fetch. Expect 0–3 new `idea`
+   issues and an `analysis/<date>.md` commit. An empty week is normal while `compass.md` is still generic.
+3. Add `approved` to an idea you like to start the Architect.
+
 ## Roadmap
-
-### Phase 3: Analyst + Critic
-
-The Scout is built. `scout export` already produces the Analyst's input, which is ranked and capped at about 150
-signals (under ~30k tokens).
-- Weekly `analyst.yml`: a shell job runs `scout export` and uploads it as an artifact. An AI job with no PAT runs Claude
-  with `.claude/agents/analyst.md` and writes `analysis/<date>.md` as an artifact. A shell job commits it.
-- `critic.yml` runs after that with `.claude/agents/critic.md`, using the same job split. A shell step files at most 3
-  issues with label `idea` from `analysis/<date>-critic.md`, and never applies `approved`: that gate stays yours.
 
 ### Phase 4: Observer
 

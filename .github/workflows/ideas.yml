@@ -1,0 +1,274 @@
+# Ideas: weekly Analyst + Critic. Turns the Scout's signals into at most a few `idea` issues.
+# Nothing here applies "approved": that gate stays human.
+#
+#   export   (no AI)         ranked Scout export + titles of existing idea issues
+#   analyst  (AI, no PAT)    clusters signals into idea cards -> analysis/<date>.md
+#   critic   (AI, no PAT)    fresh context; scores the cards -> analysis/<date>-critic.md + JSON verdict
+#   publish  (no AI)         commits analysis/, files issues. It enforces the score threshold and the cap itself,
+#                            and neutralises @mentions from internet-sourced text.
+name: Ideas
+
+on:
+  schedule:
+    - cron: "13 6 * * 1" # Mondays 06:13 UTC, after that day's Scout run
+  workflow_dispatch:
+
+concurrency:
+  group: ideas
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      date: ${{ steps.export.outputs.date }}
+      count: ${{ steps.export.outputs.count }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: scout/package-lock.json
+
+      - run: npm ci
+        working-directory: scout
+
+      - name: Export ranked signals
+        id: export
+        working-directory: scout
+        env:
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_DB: ${{ vars.MONGODB_DB || 'greenlight' }}
+          REDDIT_CLIENT_ID: ${{ secrets.REDDIT_CLIENT_ID }}
+          REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
+          PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          out="$RUNNER_TEMP/ideas-input"
+          mkdir -p "$out"
+          if [ -n "$MONGODB_URI" ]; then
+            node src/cli.ts export --out "$out/signals.jsonl"
+          else
+            echo "::notice::MONGODB_URI is not set, so this run uses today's signals instead of the last 7 days"
+            node src/cli.ts fetch --out "$RUNNER_TEMP/raw.jsonl" || true
+            [ -f "$RUNNER_TEMP/raw.jsonl" ] || : > "$RUNNER_TEMP/raw.jsonl"
+            node src/cli.ts export --from "$RUNNER_TEMP/raw.jsonl" --out "$out/signals.jsonl"
+          fi
+          count=$(wc -l < "$out/signals.jsonl" | tr -d ' ')
+          {
+            echo "count=$count"
+            echo "date=$(date -u +%F)"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$count" = "0" ]; then echo "::warning::No signals to analyse this week"; fi
+
+      - name: List existing idea issues
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 500 --json number,title,state,labels \
+            --jq '.[] | select(.title | startswith("[idea]")) | "- #\(.number) \(.title) (\(.state | ascii_downcase); \([.labels[].name] | join(", ")))"' \
+            > "$RUNNER_TEMP/ideas-input/existing-ideas.md"
+          echo "$(wc -l < "$RUNNER_TEMP/ideas-input/existing-ideas.md") existing idea issues"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ideas-input
+          path: ${{ runner.temp }}/ideas-input/
+          retention-days: 14
+
+  analyst:
+    needs: export
+    if: needs.export.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DATE: ${{ needs.export.outputs.date }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ideas-input
+          path: .greenlight-run
+
+      - name: Cluster signals into idea cards
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Analyst. Your role instructions are in .claude/agents/analyst.md.
+            Read them first and follow them exactly.
+
+            Inputs:
+            - compass.md: the owner's interests, stack, no-go list and definition of "good"
+            - .greenlight-run/signals.jsonl: ${{ needs.export.outputs.count }} ranked signals from the Scout
+            - .greenlight-run/existing-ideas.md: idea issues that already exist (don't duplicate them)
+            - templates/idea.md: the idea card format
+            - reports/*.md: the most recent weekly report, if the folder exists
+
+            Output: write analysis/${{ needs.export.outputs.date }}.md. Do not create or modify any other file.
+          claude_args: >-
+            --max-turns ${{ vars.ANALYST_MAX_TURNS || '20' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep"
+
+      - name: Check output
+        run: |
+          [ -s "analysis/$DATE.md" ] || { echo "::error::analysis/$DATE.md was not written"; exit 1; }
+          echo "$(grep -c '^## ' "analysis/$DATE.md" || true) idea card(s)"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: analysis
+          path: analysis/${{ needs.export.outputs.date }}.md
+          if-no-files-found: error
+          retention-days: 14
+
+  critic:
+    needs: [export, analyst]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: ideas-input
+          path: .greenlight-run
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: analysis
+          path: analysis
+
+      - name: Score idea cards
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Critic. Your role instructions are in .claude/agents/critic.md.
+            Read them first and follow them exactly.
+
+            Inputs:
+            - compass.md
+            - analysis/${{ needs.export.outputs.date }}.md: this week's idea cards from the Analyst
+            - .greenlight-run/signals.jsonl: the signals the Analyst worked from (verify cited evidence here)
+            - .greenlight-run/existing-ideas.md: idea issues that already exist
+            - templates/idea.md: the card format for each returned idea's body
+
+            Write analysis/${{ needs.export.outputs.date }}-critic.md, then return the structured result.
+            Do not create or modify any other file.
+          claude_args: >-
+            --max-turns ${{ vars.CRITIC_MAX_TURNS || '15' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["summary","ideas"],"properties":{"summary":{"type":"string"},"ideas":{"type":"array","maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["name","scores","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"scores":{"type":"object","additionalProperties":false,"required":["pain","competition","mvp","reach"],"properties":{"pain":{"type":"integer","minimum":0,"maximum":5},"competition":{"type":"integer","minimum":0,"maximum":5},"mvp":{"type":"integer","minimum":0,"maximum":5},"reach":{"type":"integer","minimum":0,"maximum":5}}},"body":{"type":"string","minLength":50}}}}}}'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: critic
+          path: analysis/${{ needs.export.outputs.date }}-critic.md
+          if-no-files-found: warn
+          retention-days: 14
+
+  publish:
+    needs: [export, analyst, critic]
+    if: always() && needs.analyst.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+    env:
+      DATE: ${{ needs.export.outputs.date }}
+      CRITIC_RESULT: ${{ needs.critic.result }}
+      CRITIC_JSON: ${{ needs.critic.outputs.result }}
+      MIN_SCORE: ${{ vars.CRITIC_MIN_SCORE || '14' }}
+      MAX_IDEAS: ${{ vars.CRITIC_MAX_IDEAS || '3' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # This job runs no repository code (only git and gh), so the checkout may keep its token for the push.
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: analysis
+          path: analysis
+
+      - uses: actions/download-artifact@v8
+        if: needs.critic.result == 'success'
+        continue-on-error: true
+        with:
+          name: critic
+          path: analysis
+
+      - name: Commit analysis
+        run: |
+          git config user.name "greenlight-analyst"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add analysis/
+          if git diff --cached --quiet; then echo "Nothing new to commit"; exit 0; fi
+          git commit -m "analysis: $DATE"
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && exit 0
+            sleep $((attempt * 5))
+          done
+          exit 1
+
+      - name: File idea issues
+        if: needs.critic.result == 'success'
+        run: |
+          set -euo pipefail
+          [ -n "$CRITIC_JSON" ] || { echo "::error::The Critic returned no structured result"; exit 1; }
+          analysis_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/analysis/${DATE}.md"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state all --limit 500 --json title --jq '.[].title')
+          count=$(jq '.ideas | length' <<<"$CRITIC_JSON")
+          filed=()
+          for i in $(seq 0 $((count - 1))); do
+            idea=$(jq -c ".ideas[$i]" <<<"$CRITIC_JSON")
+            name=$(jq -r '.name' <<<"$idea" | tr -d '\r\n' | cut -c1-60)
+            read -r pain competition mvp reach < <(jq -r '.scores | "\(.pain) \(.competition) \(.mvp) \(.reach)"' <<<"$idea")
+            total=$((pain + competition + mvp + reach))
+            title="[idea] $name"
+            if [ "$total" -lt "$MIN_SCORE" ]; then echo "Skipped (score $total < $MIN_SCORE): $title"; continue; fi
+            if [ "${#filed[@]}" -ge "$MAX_IDEAS" ]; then echo "Cap of $MAX_IDEAS reached"; break; fi
+            if grep -qixF -- "$title" <<<"$existing"; then echo "Already exists: $title"; continue; fi
+            # Idea text comes from the internet, so @mentions are defused to avoid pinging strangers.
+            jq -r '.body | gsub("@(?<u>[A-Za-z0-9_-])"; "@​\(.u)")' <<<"$idea" > "$RUNNER_TEMP/body.md"
+            {
+              echo
+              echo "---"
+              echo "_Filed by the Critic from [analysis/${DATE}.md](${analysis_url}). Score **${total}/20** (pain ${pain}, competition ${competition}, MVP ${mvp}, reach ${reach})._"
+              echo "_Add \`approved\` to send it to the Architect, or \`archived\` to drop it._"
+            } >> "$RUNNER_TEMP/body.md"
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label idea --body-file "$RUNNER_TEMP/body.md")
+            filed+=("$url")
+            echo "Filed $url ($total/20)"
+          done
+          {
+            echo "### Critic"
+            echo
+            jq -r '.summary' <<<"$CRITIC_JSON"
+            echo
+            if [ "${#filed[@]}" -eq 0 ]; then echo "No issues filed this week."; else printf -- '- %s\n' "${filed[@]}"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
