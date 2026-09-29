@@ -1,0 +1,83 @@
+# Factory dispatch: when an issue gets the "blueprint-ok" label, start the Factory in the
+# product repo (repository_dispatch), after checking that no other build is running.
+# No AI runs here.
+name: Factory dispatch
+
+on:
+  issues:
+    types: [labeled]
+
+# Per-issue groups. A global group would silently drop queued runs because GitHub keeps only one
+# pending run per group. The "one build at a time" rule is enforced by the label check below.
+concurrency:
+  group: factory-dispatch-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  dispatch:
+    # Human gate: only the repo owner's "blueprint-ok" label starts a build.
+    if: github.event.label.name == 'blueprint-ok' && github.actor == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ISSUE: ${{ github.event.issue.number }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Find product repo
+        id: repo
+        run: |
+          full=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate --jq '.[].body' \
+            | grep -oE 'greenlight:repo=[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | tail -n1 | cut -d= -f2 || true)
+          if [ -z "$full" ]; then
+            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+              --body "🏭 **Factory dispatch:** no product repo recorded on this issue. Run the Architect first (label \`approved\`)."
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label blueprint-ok
+            exit 1
+          fi
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+
+      - name: Enforce one build at a time
+        id: slot
+        run: |
+          busy=$(gh issue list --repo "$GITHUB_REPOSITORY" --label building --state open --json number \
+            --jq "[.[] | select(.number != $ISSUE) | \"#\" + (.number | tostring)] | join(\", \")")
+          if [ -n "$busy" ]; then
+            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+              --body "⏳ **Factory dispatch:** another build is in progress ($busy). Re-apply \`blueprint-ok\` once it is \`live\`, \`stuck\` or \`archived\`."
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label blueprint-ok
+            echo "free=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "free=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger the product repo's Factory
+        if: steps.slot.outputs.free == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          FULL: ${{ steps.repo.outputs.full }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::error::Missing repository secret GREENLIGHT_TOKEN"; exit 1; }
+          gh api "repos/$FULL/dispatches" \
+            -f event_type=greenlight-build \
+            -f "client_payload[greenlight_repo]=$GITHUB_REPOSITORY" \
+            -f "client_payload[issue]=$ISSUE"
+
+      - name: Move to "building"
+        if: steps.slot.outputs.free == 'true'
+        env:
+          FULL: ${{ steps.repo.outputs.full }}
+        run: |
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --remove-label blueprint-ready --remove-label blueprint-ok --remove-label stuck --add-label building
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --body "🏭 **Factory dispatch:** build started. Follow it at https://github.com/${FULL}/actions/workflows/factory.yml"
+
+      - name: Report failure
+        if: failure()
+        run: |
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --body "🏭 **Factory dispatch:** failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"

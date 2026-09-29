@@ -1,0 +1,34 @@
+# Keeps template/ green so the Factory never starts from a broken skeleton. No AI.
+name: Template CI
+
+on:
+  push:
+    branches: [main]
+    paths: ["template/**", ".github/workflows/template-ci.yml"]
+  pull_request:
+    paths: ["template/**", ".github/workflows/template-ci.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: template
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: template/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=high

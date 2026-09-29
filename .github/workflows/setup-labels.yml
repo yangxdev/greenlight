@@ -1,0 +1,31 @@
+# Creates (or updates) the labels that make up Greenlight's state machine.
+# Run it once from the Actions tab. Safe to re-run: existing labels are updated in place.
+name: Setup labels
+
+on:
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create state labels
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          while IFS='|' read -r name color description; do
+            gh label create "$name" --color "$color" --description "$description" --force
+          done <<'LABELS'
+          idea|c5def5|State: new idea card, waiting for human review
+          approved|0e8a16|Gate (human): idea approved, Architect writes the blueprint
+          blueprint-ready|fbca04|State: blueprint committed to the product repo, waiting for human review
+          blueprint-ok|1d76db|Gate (human): blueprint approved, Factory starts building
+          building|5319e7|State: Factory is building (only one at a time)
+          live|0b6e2e|State: deployed and smoke-tested
+          stuck|d93f0b|State: automation gave up, needs a human
+          archived|cfd3d7|State: dropped or retired
+          LABELS

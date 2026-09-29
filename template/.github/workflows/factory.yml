@@ -1,0 +1,169 @@
+# Factory: implements blueprint.md and opens one pull request.
+#
+# Triggered by greenlight's factory-dispatch workflow (repository_dispatch "greenlight-build"),
+# or by hand from the Actions tab.
+#
+# Security model:
+#   - Claude runs with this repo's short-lived GITHUB_TOKEN (contents: read). It can edit files
+#     and commit locally, but it can't push, and it never sees GREENLIGHT_TOKEN.
+#   - Deterministic steps after Claude verify the result, then push and open the PR with
+#     GREENLIGHT_TOKEN, so the PR triggers the Inspector later (GITHUB_TOKEN events don't).
+name: Factory
+
+on:
+  repository_dispatch:
+    types: [greenlight-build]
+  workflow_dispatch:
+    inputs:
+      greenlight_issue:
+        description: Greenlight issue number this build belongs to
+        required: true
+
+# One build per product repo at a time. greenlight's factory-dispatch enforces one build overall.
+concurrency:
+  group: factory
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GREENLIGHT_REPO: ${{ github.event.client_payload.greenlight_repo || vars.GREENLIGHT_REPO }}
+  GREENLIGHT_ISSUE: ${{ github.event.client_payload.issue || inputs.greenlight_issue || vars.GREENLIGHT_ISSUE }}
+  BRANCH: factory/build-${{ github.run_number }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check required secrets
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          GREENLIGHT_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+        run: |
+          missing=0
+          for name in CLAUDE_CODE_OAUTH_TOKEN GREENLIGHT_TOKEN; do
+            if [ -z "${!name}" ]; then echo "::error::Missing secret $name"; missing=1; fi
+          done
+          if [ -z "$GREENLIGHT_REPO" ] || [ -z "$GREENLIGHT_ISSUE" ]; then
+            echo "::error::GREENLIGHT_REPO / GREENLIGHT_ISSUE unknown (payload or repo variables)"; missing=1
+          fi
+          exit "$missing"
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create build branch
+        run: |
+          git config user.name "greenlight-factory"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+
+      - name: Implement blueprint
+        id: claude
+        # Running out of turns fails this step; the checks below still decide what ships.
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            You are the Greenlight Factory. Build this product from its blueprint.
+
+            1. Read CLAUDE.md (conventions, definition of done) and blueprint.md (the spec). Both are authoritative.
+            2. Implement the blueprint's tasks in order. For each task:
+               - write the code and the tests that cover that task's acceptance criteria;
+               - run `npm run check` and fix until it passes;
+               - commit only that task: `git add -A && git commit -m "task <n>: <short title>"`.
+            3. Stay inside the blueprint's scope and non-goals. Do not edit blueprint.md, CLAUDE.md or anything under .github/.
+               Do not try to push, open PRs, or call external services. Tests must not need the network.
+            4. If you run low on turns, commit the finished tasks first. A partial but green build beats a broken full one.
+            5. Finally, write build-report.md at the repo root by filling in every section of .github/build-report.md.
+               The greenlight issue is ${{ env.GREENLIGHT_REPO }}#${{ env.GREENLIGHT_ISSUE }} and the run is
+               ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+               Then commit it: `git add build-report.md && git commit -m "docs: build report"`.
+          claude_args: >-
+            --max-turns ${{ vars.FACTORY_MAX_TURNS || '80' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npm audit:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
+
+      # Everything below is deterministic. None of it trusts Claude's own "it passes".
+      - name: Commit leftovers
+        run: |
+          git add -A
+          git diff --cached --quiet || git commit -m "chore: uncommitted factory changes"
+          commits=$(git rev-list --count origin/main..HEAD)
+          echo "Factory produced $commits commit(s)"
+          if [ "$commits" -eq 0 ]; then echo "::error::Factory produced no commits"; exit 1; fi
+
+      - name: Guard protected files
+        run: |
+          changed=$(git diff --name-only origin/main...HEAD)
+          if printf '%s\n' "$changed" | grep -qE '^(\.github/|blueprint\.md$|CLAUDE\.md$)'; then
+            echo "::error::Factory modified protected files:"
+            printf '%s\n' "$changed" | grep -E '^(\.github/|blueprint\.md$|CLAUDE\.md$)'
+            exit 1
+          fi
+
+      - name: Verify (lint, test, build, audit)
+        id: verify
+        continue-on-error: true
+        run: |
+          npm ci
+          npm run check
+          npm audit --audit-level=high
+
+      - name: Push branch and open pull request
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          OK: ${{ steps.verify.outcome == 'success' && steps.claude.outcome == 'success' }}
+        run: |
+          # Hooks disabled: nothing written during the build may run with the token.
+          git -c core.hooksPath=/dev/null push \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
+          [ -s build-report.md ] || echo "_The Factory did not write a build report._" > build-report.md
+          draft=()
+          title="Build from blueprint (${GREENLIGHT_REPO}#${GREENLIGHT_ISSUE})"
+          if [ "$OK" != "true" ]; then draft=(--draft); title="[incomplete] $title"; fi
+          url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
+            --title "$title" --body-file build-report.md "${draft[@]}")
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Report to greenlight issue
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          OK: ${{ steps.verify.outcome == 'success' && steps.claude.outcome == 'success' }}
+          CLAUDE: ${{ steps.claude.outcome }}
+          VERIFY: ${{ steps.verify.outcome }}
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          if [ "$OK" = "true" ]; then
+            body="🏭 **Factory:** build finished and checks pass. PR: ${PR_URL}"$'\n\n'"Review and merge it. After merging, set the label to \`live\` by hand until the Publisher exists (phase 2)."
+            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
+          else
+            body="🏭 **Factory:** build incomplete (agent: ${CLAUDE}, checks: ${VERIFY}). Draft PR: ${PR_URL}"$'\n\n'"Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
+            gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
+          fi
+
+      - name: Report failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+        run: |
+          [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ] || exit 0
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+            --body "🏭 **Factory:** run failed before a PR could be opened: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building

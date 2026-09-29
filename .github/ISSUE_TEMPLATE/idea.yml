@@ -1,0 +1,55 @@
+name: Idea
+description: Hand-write an idea card. Label it "approved" when you want the Architect to blueprint it.
+title: "[idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One idea per issue. Be concrete: the Architect only knows what is written here plus `compass.md`.
+        The title (minus "[idea]") becomes the product repo name, so keep it short.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Who hurts, how, how often? Link the evidence (threads, posts, reviews).
+      placeholder: Freelance translators lose track of which client glossary applies to which job…
+    validations:
+      required: true
+  - type: input
+    id: users
+    attributes:
+      label: Target users
+      description: The first 100 users, and where they hang out.
+      placeholder: Freelance translators on r/TranslationStudies and ProZ forums
+    validations:
+      required: true
+  - type: textarea
+    id: mvp
+    attributes:
+      label: MVP in one day
+      description: The smallest thing that proves the value. 3–6 bullet points.
+      placeholder: |
+        - Upload a CSV glossary per client (R2)
+        - Paste text, highlight glossary terms
+        - …
+    validations:
+      required: true
+  - type: textarea
+    id: competition
+    attributes:
+      label: Existing alternatives
+      description: What people use today and why it falls short.
+  - type: textarea
+    id: signals
+    attributes:
+      label: Signals / sources
+      description: Links that inspired this (HN, Reddit, GitHub, Product Hunt…).
+  - type: textarea
+    id: nongoals
+    attributes:
+      label: Explicit non-goals
+      description: What this product must NOT do in v1.
+      placeholder: |
+        - No accounts / auth
+        - No payments
