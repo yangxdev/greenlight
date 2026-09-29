@@ -145,6 +145,13 @@ A task is done when all of these hold:
 6. `GET /api/health` still returns `{ ok: true }` (the Publisher's smoke test depends on it).
 7. Work is committed as one commit per task: `task <n>: <short title>`.
 
+## How your work is checked
+
+Every PR gets the **Inspector**. First it runs a secret scan, `npm ci`, lint, tests, build and `npm audit`, then an AI
+review against `blueprint.md` and this file. On failure the findings are posted as a PR comment and the Factory runs
+again in fix mode with them in `.greenlight-run/findings.md` (a scratch folder, never committed). After 3 failed rounds
+a human takes over. A pass merges the PR, and the Publisher deploys to Cloudflare Pages and smoke-tests `/api/health`.
+
 ## Files the Factory must not change
 
 `blueprint.md`, `CLAUDE.md`, `.github/**`, `wrangler.toml`'s `name`. If the blueprint looks wrong, stop and write why in

@@ -20,8 +20,8 @@ The Analyst, Critic and Architect read it.
 
 | Phase | Actors | Status |
 |-------|--------|--------|
-| 1 | Board, Architect, Factory, product template | **built** (this commit) |
-| 2 | Inspector, Publisher | roadmap |
+| 1 | Board, Architect, Factory, product template | **built** |
+| 2 | Inspector, Factory fix loop, Publisher | **built** |
 | 3 | Scout, Analyst, Critic | roadmap (role prompts exist in `.claude/agents/`) |
 | 4 | Observer | roadmap (role prompt exists in `.claude/agents/`) |
 
@@ -30,9 +30,13 @@ The Analyst, Critic and Architect read it.
 Each idea issue carries exactly one state label. Two transitions are human gates (🧑).
 
 ```
-idea ──🧑──► approved ──Architect──► blueprint-ready ──🧑──► blueprint-ok ──dispatch──► building ──► live
-                │                                                                           │
-                └──────────────── (any automated step fails) ──────────────────► stuck ◄────┘
+idea ──🧑──► approved ──Architect──► blueprint-ready ──🧑──► blueprint-ok ──dispatch──► building
+                                                                                          │
+      Factory PR ──► Inspector ──pass──► merge ──► Publisher (deploy + smoke test) ──► live
+                        │  ▲
+                   fail │  │ fix push (max 3 rounds)
+                        ▼  │
+                      Factory fix ── rounds exhausted / any automated step fails ──► stuck
 any state ──🧑──► archived
 ```
 
@@ -43,11 +47,12 @@ any state ──🧑──► archived
 | `blueprint-ready` | Architect | Review/edit `blueprint.md` in the product repo |
 | `blueprint-ok` | **you** | `factory-dispatch.yml` checks nothing else is `building`, then triggers the product's Factory |
 | `building` | factory-dispatch | The Factory is implementing the blueprint. **Only one issue at a time.** |
-| `live` | you (phase 1) · Publisher (phase 2) | Deployed and smoke-tested |
-| `stuck` | any workflow | Automation gave up. The issue comment links the failed run |
+| `live` | Publisher | Deployed to `*.pages.dev` and `/api/health` answered `{ ok: true }` |
+| `stuck` | any workflow | Automation gave up. The issue comment links the failed run or PR |
 | `archived` | you · Observer suggestion | Dropped or retired. Close the issue too |
 
-Retry anything by removing and re-adding the gate label (`approved` or `blueprint-ok`).
+Retry anything by removing and re-adding the gate label (`approved` or `blueprint-ok`). A stuck PR can be fixed by
+hand: push to its `factory/*` branch and the Inspector re-runs. If it passes, it merges and the Publisher clears `stuck`.
 To regenerate a blueprint, comment your feedback on the issue (your comments are passed to the Architect) and re-apply `approved`.
 
 ## Repo layout
@@ -65,7 +70,10 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
 template/                   product skeleton copied into every new product repo
   CLAUDE.md                 stack conventions, R2/Mongo usage, testing rules, definition of done
   src/ functions/ shared/   Vite + React + RTK + Tailwind + TS app, Pages Functions, shared types
-  .github/workflows/factory.yml
+  .github/workflows/
+    factory.yml             build from blueprint / fix from Inspector findings
+    inspector.yml           checks + AI review on every PR, merge or send back
+    deploy.yml              Publisher: Cloudflare Pages deploy, smoke test, "live"
   .github/build-report.md
 ```
 
@@ -75,47 +83,72 @@ folder costs nothing, and template changes land in the same PR as workflow chang
 In both setups, existing products don't receive later template changes. That's intended, because each product is a
 snapshot.
 
-## How phase 1 works
+## How it works (phases 1 and 2)
 
 1. **You** open an issue with the *Idea* form (label `idea`) and later add `approved`.
-2. **Architect** (`architect.yml`, about 20 turns max):
-   - a shell step creates `<you>/<slugified-title>` (private by default) from `template/`, replacing the
-     `greenlight-product` placeholder with the repo name;
-   - it copies `CLAUDE_CODE_OAUTH_TOKEN`, `GREENLIGHT_TOKEN` and, if present, the Cloudflare secrets into the product
-     repo, and sets the variables `GREENLIGHT_REPO`/`GREENLIGHT_ISSUE`;
-   - Claude reads `compass.md`, the issue (plus your comments) and `templates/blueprint.md`, and writes only
-     `blueprint.md`. It has only Read/Write/Edit/Glob/Grep and the short-lived `GITHUB_TOKEN`;
-   - shell steps check the blueprint (required sections, 1–10 tasks, no other files touched), commit it, comment
-     the link with a `<!-- greenlight:repo=owner/name -->` marker, and set the label to `blueprint-ready`.
+2. **Architect** (`architect.yml`, about 20 turns max), in three jobs:
+   - `scaffold` (no AI) creates `<you>/<slugified-title>` (private by default) from `template/`, replacing the
+     `greenlight-product` placeholder with the repo name. It copies `CLAUDE_CODE_OAUTH_TOKEN`, `GREENLIGHT_TOKEN` and,
+     if present, the Cloudflare secrets into the product repo, and sets the variables `GREENLIGHT_REPO`/`GREENLIGHT_ISSUE`;
+   - `blueprint` (AI): Claude reads `compass.md`, the issue (plus your comments) and `templates/blueprint.md`, and
+     writes only `blueprint.md`, which leaves the job as an artifact;
+   - `publish` (no AI) checks the blueprint (required sections, 1–10 tasks), commits it, comments the link with a
+     `<!-- greenlight:repo=owner/name -->` marker, and sets the label to `blueprint-ready`.
 3. **You** review `blueprint.md` in the product repo (edit it freely) and add `blueprint-ok`.
 4. **Factory dispatch** (`factory-dispatch.yml`, no AI) refuses if another issue is `building`, otherwise sends
    `repository_dispatch: greenlight-build` to the product repo and sets the label to `building`.
-5. **Factory** (`template/.github/workflows/factory.yml` in the product repo, about 80 turns max):
-   - Claude implements the tasks in order, runs `npm run check` after each, commits `task N: …`, and writes
-     `build-report.md`. It can't push, and its tools are limited to file edits, `npm`/`npx` checks and local `git`;
-   - shell steps block edits to `.github/`, `blueprint.md` and `CLAUDE.md`, re-run lint/test/build/audit themselves,
-     push `factory/build-N` with hooks disabled, open a PR (a draft if anything failed) whose body is the build
-     report, and comment on the greenlight issue. On failure the label becomes `stuck`.
-6. **You** review and merge the PR, deploy by hand if you want it live now (see phase 2), and set `live`.
+5. **Factory** (`factory.yml` in the product repo, about 80 turns max). Claude implements the tasks in order, runs
+   `npm run check` after each, commits `task N: …`, and writes `build-report.md`. The commits leave the AI job as a
+   git bundle. A fresh `verify` job re-runs lint/test/build/audit. `publish` blocks edits to `.github/`, `blueprint.md`
+   and `CLAUDE.md`, pushes `factory/build-N`, and opens a PR (a draft if incomplete) with the build report as its body.
+6. **Inspector** (`inspector.yml`, on every PR):
+   - `checks` (no AI): gitleaks secret scan, `npm ci`, lint, test, build, `npm audit --audit-level=high`;
+   - `review` (AI, about 25 turns, only if all checks pass): Claude compares the diff with the blueprint's tasks and
+     acceptance criteria and CLAUDE.md's definition of done. It returns a JSON verdict (`--json-schema`) with read-only tools;
+   - `decide` (no AI) posts the verdict as a PR comment. On **pass** it merges (squash); set `AUTO_MERGE=false` to merge
+     yourself. On **fail** it dispatches `greenlight-fix`, and the Factory reads the findings comment, fixes, and pushes
+     to the same branch, which re-triggers the Inspector. After `INSPECTOR_MAX_ROUNDS` (3) failed fix rounds, or if
+     the AI review can't finish (e.g. usage limit), the issue becomes `stuck`.
+7. **Publisher** (`deploy.yml`, on push to `main`, no AI): builds, creates the Pages project on first deploy, runs
+   `wrangler pages deploy`, smoke-tests `https://<project>.pages.dev/api/health` and `/`, comments the live URL, and
+   sets `live`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
+   Cloudflare secrets are missing.
+
+Things the Factory can't do for you are listed under "Manual setup required" in the PR's build report: creating an R2
+bucket, `wrangler pages secret put MONGODB_URI`, and Atlas network access.
 
 ### Usage limits
 
 The Pro plan's usage limits are the real budget:
 
 - **One build at a time.** factory-dispatch checks the `building` label.
-- **Every agent has `--max-turns`.** Architect uses `ARCHITECT_MAX_TURNS` (default 20) and Factory uses
-  `FACTORY_MAX_TURNS` (default 80). Every job also has a `timeout-minutes`.
+- **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
+  `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
+  Worst case per product is about 1 Architect + 1 build + 4 reviews + 3 fixes.
+- **The AI review only runs when deterministic checks pass.** A red check goes back to the Factory with the log, without
+  spending a review.
 - **No AI in deterministic steps.** Repo creation, secrets, validation, checks, pushes, PRs and labels are all shell.
 - **GitHub Actions minutes:** private repos get 2,000 free minutes a month and public repos are unlimited. A Factory run
   can take up to 90 minutes. If minutes get tight, set `PRODUCT_VISIBILITY=public` (secrets stay secret either way).
 
 ### Security model
 
-- `GREENLIGHT_TOKEN` (a fine-grained PAT) is only given to shell steps. Claude steps get the job's `GITHUB_TOKEN`
-  (read-only in the Factory), so text in an idea or blueprint can't be used to steal the PAT or push directly.
-- Pushes that use the PAT run with `core.hooksPath=/dev/null`, so nothing written during a build runs with the token.
+Every workflow that runs Claude is split into jobs, so **no AI job and no job that runs repository code ever shares
+a runner with `GREENLIGHT_TOKEN` or the Cloudflare token.** Within one job, code can poison later steps (for example
+through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
+
+| Workflow | AI / repo-code jobs (no PAT) | Credentialed jobs (no AI, no repo code) |
+|----------|------------------------------|-----------------------------------------|
+| Architect | `blueprint` (artifact out: blueprint.md) | `scaffold`, `publish` |
+| Factory | `agent` (git bundle out), `verify` | `prepare`, `publish` |
+| Inspector | `checks`, `review` (JSON verdict out) | `decide` |
+| Publisher | `build` (dist/ out) | `gate`, `deploy` (`npm ci --ignore-scripts`, wrangler installed outside the repo), `report` |
+
+- Claude gets the job's short-lived, read-only `GITHUB_TOKEN`. Pushes use the PAT with `core.hooksPath=/dev/null`.
 - Gate labels only trigger when you apply them (`github.actor == github.repository_owner`).
-- In phase 3, idea text comes from the open internet, which is why the Claude steps never hold cross-repo credentials.
+- Remaining exposure: the Factory's `agent` job runs code Claude writes (`npm run …`), and that job holds
+  `CLAUDE_CODE_OAUTH_TOKEN`. The worst case is someone using your Claude quota. Rotate it with `claude setup-token`
+  if you ever suspect that, and keep ideas from the open internet (phase 3) behind your `approved` gate.
 
 ## One-time setup
 
@@ -145,7 +178,7 @@ Use your **personal** account.
   | Secrets | Read and write | copying secrets into product repos |
   | Variables | Read and write | setting `GREENLIGHT_REPO`/`GREENLIGHT_ISSUE` on product repos |
   | Issues | Read and write | Factory commenting/labelling greenlight issues |
-  | Pull requests | Read and write | Factory opening PRs |
+  | Pull requests | Read and write | Factory opening PRs, Inspector merging them |
   | Metadata | Read-only | (mandatory) |
 
 The default `GITHUB_TOKEN` can't create repos or act across repos, so this token is required.
@@ -158,15 +191,17 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 |--------|-------|-------|
 | `CLAUDE_CODE_OAUTH_TOKEN` | output of `claude setup-token` | 1 |
 | `GREENLIGHT_TOKEN` | the fine-grained PAT | 1 |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → custom token with **Account › Cloudflare Pages › Edit** | 2 (optional now) |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID | 2 (optional now) |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → custom token with **Account › Cloudflare Pages › Edit** | 2 |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID | 2 |
 
-If the Cloudflare secrets exist when the Architect runs, they're copied into the product repo for phase 2.
-Product repos created before you add them need them set by hand (or re-apply `approved`; the Architect reuses the repo).
+The Architect copies all four into each product repo it creates. Product repos created before you add a secret need it
+set by hand, or you can re-apply `approved` (the Architect reuses the existing repo and re-copies secrets).
 
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`private`|`public`, default `private`),
-`PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (default 20), `FACTORY_MAX_TURNS` (default 80),
-`CLAUDE_MODEL` (passed as `--model`; empty uses Claude Code's default for your plan).
+`PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
+`INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), and `CLAUDE_MODEL` (passed as `--model`;
+empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can
+override them there per product.
 
 ### 4. Create the labels
 
@@ -192,20 +227,6 @@ so it's left out on purpose.
 Replace the `TODO`s: interests, background and the no-go list.
 
 ## Roadmap
-
-### Phase 2: Inspector + Publisher
-
-- `template/.github/workflows/inspector.yml` (on `pull_request`): deterministic job (`npm ci`, lint, test, build,
-  `npm audit --audit-level=high`, secret scan with gitleaks), then a Claude review step that checks the diff against
-  `blueprint.md`'s acceptance criteria and `build-report.md`. On failure it dispatches `greenlight-fix` back to the Factory
-  with the findings as a markdown file. After 3 rounds (a counter in the PR labels) it labels the greenlight issue `stuck`.
-- Factory: add a `greenlight-fix` mode that checks out the PR branch and addresses the Inspector's findings file.
-- `template/.github/workflows/deploy.yml` (on push to `main`, no AI): `npm ci && npm run build`,
-  `npx wrangler pages project create <name> --production-branch main` (first time only), then
-  `cloudflare/wrangler-action@v4` with `command: pages deploy dist --project-name=<name> --branch=main`,
-  a `curl` smoke test of `https://<name>.pages.dev/api/health`, a comment with the live URL on the greenlight issue,
-  and the `live` label.
-- Until then you can deploy by hand from a product repo: `npm run build && npx wrangler pages deploy dist --project-name <repo>`.
 
 ### Phase 3: Scout + Analyst + Critic
 

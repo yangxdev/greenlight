@@ -1,25 +1,34 @@
-# Factory: implements blueprint.md and opens one pull request.
+# Factory: implements blueprint.md (mode "build") or addresses Inspector findings on an open
+# Factory PR (mode "fix").
 #
-# Triggered by greenlight's factory-dispatch workflow (repository_dispatch "greenlight-build"),
-# or by hand from the Actions tab.
+# Triggers:
+#   repository_dispatch greenlight-build   from greenlight's factory-dispatch workflow
+#   repository_dispatch greenlight-fix     from this repo's Inspector ({ pr, round })
+#   workflow_dispatch                      by hand
 #
-# Security model:
-#   - Claude runs with this repo's short-lived GITHUB_TOKEN (contents: read). It can edit files
-#     and commit locally, but it can't push, and it never sees GREENLIGHT_TOKEN.
-#   - Deterministic steps after Claude verify the result, then push and open the PR with
-#     GREENLIGHT_TOKEN, so the PR triggers the Inspector later (GITHUB_TOKEN events don't).
+# Security model: the AI job never shares a runner with GREENLIGHT_TOKEN.
+#   prepare  (no AI)        resolve branch, fetch Inspector findings
+#   agent    (AI, no PAT)   Claude edits and commits locally, and the commits leave as a git bundle
+#   verify   (no secrets)   re-runs lint, test, build and audit on the bundle in a fresh runner
+#   publish  (PAT, no AI)   guards protected files, pushes, opens the PR and reports to greenlight.
+#                           It never runs repository code.
 name: Factory
 
 on:
   repository_dispatch:
-    types: [greenlight-build]
+    types: [greenlight-build, greenlight-fix]
   workflow_dispatch:
     inputs:
-      greenlight_issue:
-        description: Greenlight issue number this build belongs to
-        required: true
+      mode:
+        description: build (from blueprint) or fix (address Inspector findings on a PR)
+        type: choice
+        options: [build, fix]
+        default: build
+      pr:
+        description: PR number (fix mode only)
+        required: false
 
-# One build per product repo at a time. greenlight's factory-dispatch enforces one build overall.
+# One Factory run per product repo at a time. greenlight's factory-dispatch enforces one build overall.
 concurrency:
   group: factory
   cancel-in-progress: false
@@ -29,15 +38,23 @@ permissions:
 
 env:
   GREENLIGHT_REPO: ${{ github.event.client_payload.greenlight_repo || vars.GREENLIGHT_REPO }}
-  GREENLIGHT_ISSUE: ${{ github.event.client_payload.issue || inputs.greenlight_issue || vars.GREENLIGHT_ISSUE }}
-  BRANCH: factory/build-${{ github.run_number }}
+  GREENLIGHT_ISSUE: ${{ github.event.client_payload.issue || vars.GREENLIGHT_ISSUE }}
+  MODE: ${{ github.event.action == 'greenlight-fix' && 'fix' || inputs.mode || 'build' }}
+  PR: ${{ github.event.client_payload.pr || inputs.pr }}
+  ROUND: ${{ github.event.client_payload.round || '?' }}
 
 jobs:
-  build:
+  prepare:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      branch: ${{ steps.branch.outputs.branch }}
+      base: ${{ steps.branch.outputs.base }}
     steps:
-      - name: Check required secrets
+      - name: Check required secrets and context
         env:
           CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           GREENLIGHT_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
@@ -49,10 +66,59 @@ jobs:
           if [ -z "$GREENLIGHT_REPO" ] || [ -z "$GREENLIGHT_ISSUE" ]; then
             echo "::error::GREENLIGHT_REPO / GREENLIGHT_ISSUE unknown (payload or repo variables)"; missing=1
           fi
+          if [ "$MODE" = "fix" ] && [ -z "$PR" ]; then echo "::error::fix mode needs a PR number"; missing=1; fi
           exit "$missing"
 
+      - name: Resolve branch
+        id: branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "$MODE" = "build" ]; then
+            echo "branch=factory/build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            echo "base=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" >> "$GITHUB_OUTPUT"
+          else
+            read -r state head sha < <(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json state,headRefName,headRefOid \
+              --jq '[.state, .headRefName, .headRefOid] | @tsv')
+            if [ "$state" != "OPEN" ] || [[ "$head" != factory/* ]]; then
+              echo "::error::PR #$PR is not an open Factory PR (state=$state, branch=$head)"; exit 1
+            fi
+            echo "branch=$head" >> "$GITHUB_OUTPUT"
+            echo "base=$sha" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fetch latest Inspector findings
+        if: env.MODE == 'fix'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/findings"
+          gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("greenlight:inspector verdict=fail")))] | last | .body // ""' \
+            > "$RUNNER_TEMP/findings/findings.md"
+          [ -s "$RUNNER_TEMP/findings/findings.md" ] || { echo "::error::No Inspector findings on PR #$PR"; exit 1; }
+
+      - if: env.MODE == 'fix'
+        uses: actions/upload-artifact@v7
+        with:
+          name: findings
+          path: ${{ runner.temp }}/findings/findings.md
+          retention-days: 3
+
+  agent:
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    outputs:
+      claude: ${{ env.MODE == 'build' && steps.claude.outcome || steps.claude_fix.outcome }}
+      commits: ${{ steps.bundle.outputs.commits }}
+    env:
+      BRANCH: ${{ needs.prepare.outputs.branch }}
+      BASE: ${{ needs.prepare.outputs.base }}
+    steps:
       - uses: actions/checkout@v7
         with:
+          ref: ${{ needs.prepare.outputs.base }}
           fetch-depth: 0
           persist-credentials: false
 
@@ -64,20 +130,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create build branch
+      - name: Prepare working branch
         run: |
           git config user.name "greenlight-factory"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch -c "$BRANCH"
 
+      - if: env.MODE == 'fix'
+        uses: actions/download-artifact@v8
+        with:
+          name: findings
+          path: .greenlight-run
+
       - name: Implement blueprint
         id: claude
-        # Running out of turns fails this step; the checks below still decide what ships.
+        if: env.MODE == 'build'
+        # Running out of turns fails this step; verify and publish still decide what ships.
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ github.token }}
           prompt: |
             You are the Greenlight Factory. Build this product from its blueprint.
 
@@ -98,72 +171,170 @@ jobs:
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npm audit:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
 
-      # Everything below is deterministic. None of it trusts Claude's own "it passes".
-      - name: Commit leftovers
+      - name: Address Inspector findings
+        id: claude_fix
+        if: env.MODE == 'fix'
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Factory, fix round ${{ env.ROUND }} for PR #${{ env.PR }}.
+
+            1. Read .greenlight-run/findings.md: the Inspector's failed checks and review findings for this branch.
+            2. Read CLAUDE.md and blueprint.md. They are authoritative; the findings tell you where the build falls short.
+            3. Fix every blocker. For failing checks, reproduce with the matching npm script first.
+               If a task from blueprint.md is missing, implement it with tests.
+            4. Run `npm run check` until it passes, then commit: `git add -A && git commit -m "fix: <what>"`
+               (several commits are fine).
+            5. Update build-report.md so it reflects the current state, and commit it.
+            Do not edit blueprint.md, CLAUDE.md or anything under .github/. Do not push. Tests must not need the network.
+          claude_args: >-
+            --max-turns ${{ vars.FIX_MAX_TURNS || '40' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npm audit:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
+
+      - name: Bundle commits
+        id: bundle
         run: |
+          rm -rf .greenlight-run
           git add -A
           git diff --cached --quiet || git commit -m "chore: uncommitted factory changes"
-          commits=$(git rev-list --count origin/main..HEAD)
+          commits=$(git rev-list --count "$BASE..HEAD")
+          echo "commits=$commits" >> "$GITHUB_OUTPUT"
           echo "Factory produced $commits commit(s)"
-          if [ "$commits" -eq 0 ]; then echo "::error::Factory produced no commits"; exit 1; fi
+          mkdir -p "$RUNNER_TEMP/bundle"
+          if [ "$commits" -gt 0 ]; then git bundle create "$RUNNER_TEMP/bundle/factory.bundle" "$BASE..HEAD"; fi
 
-      - name: Guard protected files
+      - if: steps.bundle.outputs.commits != '0'
+        uses: actions/upload-artifact@v7
+        with:
+          name: factory-bundle
+          path: ${{ runner.temp }}/bundle/factory.bundle
+          retention-days: 7
+
+  verify:
+    needs: [prepare, agent]
+    if: needs.agent.outputs.commits != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      result: ${{ steps.check.outcome }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.base }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: factory-bundle
+          path: ${{ runner.temp }}/bundle
+
+      - name: Apply bundle
         run: |
-          changed=$(git diff --name-only origin/main...HEAD)
-          if printf '%s\n' "$changed" | grep -qE '^(\.github/|blueprint\.md$|CLAUDE\.md$)'; then
-            echo "::error::Factory modified protected files:"
-            printf '%s\n' "$changed" | grep -E '^(\.github/|blueprint\.md$|CLAUDE\.md$)'
-            exit 1
-          fi
+          git bundle verify "$RUNNER_TEMP/bundle/factory.bundle"
+          git fetch "$RUNNER_TEMP/bundle/factory.bundle" HEAD
+          git checkout --detach FETCH_HEAD
 
-      - name: Verify (lint, test, build, audit)
-        id: verify
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Lint, test, build, audit
+        id: check
         continue-on-error: true
         run: |
           npm ci
           npm run check
           npm audit --audit-level=high
 
-      - name: Push branch and open pull request
-        id: pr
+  no-output:
+    needs: agent
+    if: needs.agent.outputs.commits == '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report empty run
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
-          OK: ${{ steps.verify.outcome == 'success' && steps.claude.outcome == 'success' }}
+          CLAUDE: ${{ needs.agent.outputs.claude }}
+        run: |
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+            --body "🏭 **Factory ($MODE):** produced no commits (agent: $CLAUDE), so it needs a human. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
+
+  publish:
+    needs: [prepare, agent, verify]
+    if: always() && needs.agent.result == 'success' && needs.agent.outputs.commits != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      BRANCH: ${{ needs.prepare.outputs.branch }}
+      BASE: ${{ needs.prepare.outputs.base }}
+      COMMITS: ${{ needs.agent.outputs.commits }}
+      CLAUDE: ${{ needs.agent.outputs.claude }}
+      VERIFY: ${{ needs.verify.outputs.result || 'skipped' }}
+      GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare.outputs.base }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: factory-bundle
+          path: ${{ runner.temp }}/bundle
+
+      - name: Apply bundle and guard protected files
+        run: |
+          git bundle verify "$RUNNER_TEMP/bundle/factory.bundle"
+          git fetch "$RUNNER_TEMP/bundle/factory.bundle" HEAD
+          git checkout --detach FETCH_HEAD
+          if [ "$(git merge-base "$BASE" HEAD)" != "$BASE" ]; then echo "::error::bundle is not based on $BASE"; exit 1; fi
+          protected=$(git diff --name-only "$BASE..HEAD" | grep -E '^(\.github/|blueprint\.md$|CLAUDE\.md$)' || true)
+          if [ -n "$protected" ]; then echo "::error::Factory modified protected files:"; echo "$protected"; exit 1; fi
+
+      - name: Push branch
         run: |
           # Hooks disabled: nothing written during the build may run with the token.
           git -c core.hooksPath=/dev/null push \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/${BRANCH}"
-          [ -s build-report.md ] || echo "_The Factory did not write a build report._" > build-report.md
+
+      - name: Open pull request
+        if: env.MODE == 'build'
+        run: |
+          if [ -s build-report.md ]; then cp build-report.md "$RUNNER_TEMP/body.md"; else echo "_The Factory did not write a build report._" > "$RUNNER_TEMP/body.md"; fi
           draft=()
           title="Build from blueprint (${GREENLIGHT_REPO}#${GREENLIGHT_ISSUE})"
-          if [ "$OK" != "true" ]; then draft=(--draft); title="[incomplete] $title"; fi
+          if [ "$CLAUDE" != "success" ] || [ "$VERIFY" != "success" ]; then draft=(--draft); title="[incomplete] $title"; fi
           url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
-            --title "$title" --body-file build-report.md "${draft[@]}")
-          echo "url=$url" >> "$GITHUB_OUTPUT"
+            --title "$title" --body-file "$RUNNER_TEMP/body.md" "${draft[@]}")
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+            --body "🏭 **Factory:** PR opened: ${url} (agent: ${CLAUDE}, checks: ${VERIFY}). The Inspector reviews it next."
 
-      - name: Report to greenlight issue
-        env:
-          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
-          OK: ${{ steps.verify.outcome == 'success' && steps.claude.outcome == 'success' }}
-          CLAUDE: ${{ steps.claude.outcome }}
-          VERIFY: ${{ steps.verify.outcome }}
-          PR_URL: ${{ steps.pr.outputs.url }}
+      - name: Report fix round
+        if: env.MODE == 'fix'
         run: |
-          if [ "$OK" = "true" ]; then
-            body="🏭 **Factory:** build finished and checks pass. PR: ${PR_URL}"$'\n\n'"Review and merge it. After merging, set the label to \`live\` by hand until the Publisher exists (phase 2)."
-            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
-          else
-            body="🏭 **Factory:** build incomplete (agent: ${CLAUDE}, checks: ${VERIFY}). Draft PR: ${PR_URL}"$'\n\n'"Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
-            gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
-          fi
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" \
+            --body "🏭 **Factory:** fix round ${ROUND} pushed ${COMMITS} commit(s) (agent: ${CLAUDE}, checks: ${VERIFY}). The Inspector re-runs on this push."
 
+  report-failure:
+    needs: [prepare, agent, verify, publish]
+    if: failure()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
       - name: Report failure
-        if: failure()
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
         run: |
           [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ] || exit 0
           gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-            --body "🏭 **Factory:** run failed before a PR could be opened: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            --body "🏭 **Factory ($MODE):** run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building

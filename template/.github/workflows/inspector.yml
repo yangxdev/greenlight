@@ -1,0 +1,299 @@
+# Inspector: gates every pull request into main.
+#
+#   checks  (no secrets)    secret scan, install, lint, test, build, audit
+#   review  (AI, no PAT)    Claude checks the diff against blueprint.md, only if every check passed.
+#                           It has read-only tools and returns a structured verdict.
+#   decide  (PAT, no AI)    comments the verdict. On Factory PRs: pass means merge (Publisher deploys);
+#                           fail sends the findings back to the Factory, up to INSPECTOR_MAX_ROUNDS,
+#                           then labels the greenlight issue "stuck". It never runs repository code.
+name: Inspector
+
+on:
+  pull_request:
+    branches: [main]
+    # Not ready_for_review: decide marks drafts ready right before merging, and a re-run would cancel that merge.
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: inspector-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PR: ${{ github.event.pull_request.number }}
+  BASE_SHA: ${{ github.event.pull_request.base.sha }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+  HEAD_REF: ${{ github.event.pull_request.head.ref }}
+  GITLEAKS_VERSION: 8.30.1
+  GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      secrets: ${{ steps.secrets.outcome }}
+      install: ${{ steps.install.outcome }}
+      lint: ${{ steps.lint.outcome }}
+      test: ${{ steps.test.outcome }}
+      build: ${{ steps.build.outcome }}
+      audit: ${{ steps.audit.outcome }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # Runs before any repository code, so nothing in the PR can tamper with it.
+      - name: Secret scan (gitleaks)
+        id: secrets
+        continue-on-error: true
+        run: |
+          mkdir -p "$RUNNER_TEMP/logs" "$RUNNER_TEMP/gitleaks"
+          curl -sSfL -o "$RUNNER_TEMP/gitleaks.tgz" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          echo "${GITLEAKS_SHA256}  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/gitleaks" gitleaks
+          "$RUNNER_TEMP/gitleaks/gitleaks" git --no-banner --redact --log-opts="${BASE_SHA}..${HEAD_SHA}" . \
+            2>&1 | tee "$RUNNER_TEMP/logs/secrets.log"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Install
+        id: install
+        continue-on-error: true
+        run: npm ci 2>&1 | tee "$RUNNER_TEMP/logs/install.log"
+
+      - name: Lint
+        id: lint
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee "$RUNNER_TEMP/logs/lint.log"
+
+      - name: Test
+        id: test
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm test 2>&1 | tee "$RUNNER_TEMP/logs/test.log"
+
+      - name: Build
+        id: build
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm run build 2>&1 | tee "$RUNNER_TEMP/logs/build.log"
+
+      - name: Audit
+        id: audit
+        if: steps.install.outcome == 'success'
+        continue-on-error: true
+        run: npm audit --audit-level=high 2>&1 | tee "$RUNNER_TEMP/logs/audit.log"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: inspector-logs
+          path: ${{ runner.temp }}/logs/
+          retention-days: 7
+
+  review:
+    needs: checks
+    if: >-
+      needs.checks.outputs.secrets == 'success' && needs.checks.outputs.install == 'success' &&
+      needs.checks.outputs.lint == 'success' && needs.checks.outputs.test == 'success' &&
+      needs.checks.outputs.build == 'success' && needs.checks.outputs.audit == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      outcome: ${{ steps.claude.outcome }}
+      verdict: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Export the change for review
+        run: |
+          mkdir -p .greenlight-run
+          git diff "${BASE_SHA}...${HEAD_SHA}" > .greenlight-run/pr.diff
+          git log --format='%h %s' "${BASE_SHA}..${HEAD_SHA}" > .greenlight-run/commits.txt
+          git diff --stat "${BASE_SHA}...${HEAD_SHA}" > .greenlight-run/diffstat.txt
+
+      - name: Review against the blueprint
+        id: claude
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Inspector. Deterministic checks (lint, tests, build, audit, secret scan) already
+            passed. Judge whether this pull request delivers what blueprint.md promises, to the standard in CLAUDE.md.
+
+            Read: blueprint.md, CLAUDE.md, build-report.md (if present), .greenlight-run/diffstat.txt,
+            .greenlight-run/commits.txt, .greenlight-run/pr.diff, and any source file you need for context.
+
+            Mark verdict "fail" only for blockers:
+            - an acceptance criterion that is not implemented, or has no test that meaningfully exercises it;
+            - a blueprint task that is missing or only stubbed;
+            - a CLAUDE.md "Definition of done" violation (any, ts-ignore, network in tests, secrets, unjustified deps);
+            - a security problem (unvalidated input reaching storage, secrets in client code, open R2 writes);
+            - work outside the blueprint's scope that adds risk (auth, payments, new services).
+            Style preferences and nice-to-haves are "minor" and never fail the review.
+
+            Each finding must say where (file), what is wrong, and the concrete fix, so the Factory can act on it alone.
+            You only review: do not modify files.
+          claude_args: >-
+            --max-turns ${{ vars.INSPECTOR_MAX_TURNS || '25' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Glob,Grep"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["severity","file","problem","fix"],"properties":{"severity":{"type":"string","enum":["blocker","minor"]},"criterion":{"type":"string"},"file":{"type":"string"},"problem":{"type":"string"},"fix":{"type":"string"}}}}}}'
+
+  decide:
+    needs: [checks, review]
+    if: always() && needs.checks.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    env:
+      GREENLIGHT_REPO: ${{ vars.GREENLIGHT_REPO }}
+      GREENLIGHT_ISSUE: ${{ vars.GREENLIGHT_ISSUE }}
+      MAX_ROUNDS: ${{ vars.INSPECTOR_MAX_ROUNDS || '3' }}
+      AUTO_MERGE: ${{ vars.AUTO_MERGE || 'true' }}
+      IS_DRAFT: ${{ github.event.pull_request.draft }}
+      C_SECRETS: ${{ needs.checks.outputs.secrets }}
+      C_INSTALL: ${{ needs.checks.outputs.install }}
+      C_LINT: ${{ needs.checks.outputs.lint }}
+      C_TEST: ${{ needs.checks.outputs.test }}
+      C_BUILD: ${{ needs.checks.outputs.build }}
+      C_AUDIT: ${{ needs.checks.outputs.audit }}
+      REVIEW_RESULT: ${{ needs.review.result }}
+      REVIEW_OUTCOME: ${{ needs.review.outputs.outcome }}
+      REVIEW_JSON: ${{ needs.review.outputs.verdict }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: inspector-logs
+          path: ${{ runner.temp }}/logs
+
+      - name: Decide and report
+        env:
+          BOT_TOKEN: ${{ github.token }}
+          PAT: ${{ secrets.GREENLIGHT_TOKEN }}
+        run: |
+          set -euo pipefail
+          icon() { case "$1" in success) echo "✅";; skipped) echo "⏭️";; *) echo "❌";; esac; }
+          body="$RUNNER_TEMP/comment.md"
+
+          checks_ok=true
+          for c in SECRETS INSTALL LINT TEST BUILD AUDIT; do
+            v="C_$c"; [ "${!v}" = "success" ] || checks_ok=false
+          done
+
+          # verdict: pass | fail | error (the review could not finish, e.g. usage limit or max turns)
+          if [ "$checks_ok" != true ]; then
+            verdict=fail
+          elif [ "$REVIEW_OUTCOME" != "success" ] || [ -z "$REVIEW_JSON" ]; then
+            verdict=error
+          else
+            verdict=$(jq -r '.verdict' <<<"$REVIEW_JSON")
+          fi
+
+          prev_fails=$(GH_TOKEN="$BOT_TOKEN" gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate \
+            --jq '[.[] | select(.user.login == "github-actions[bot]" and (.body | contains("greenlight:inspector verdict=fail")))] | length' \
+            | awk '{s+=$1} END {print s+0}')
+          round=$((prev_fails + 1))
+
+          {
+            echo "<!-- greenlight:inspector verdict=${verdict} round=${round} head=${HEAD_SHA} -->"
+            case "$verdict" in
+              pass)  echo "## 🔍 Inspector: ✅ pass" ;;
+              fail)
+                if [ "$prev_fails" -lt "$MAX_ROUNDS" ]; then echo "## 🔍 Inspector: ❌ fail. Sending to the Factory (fix round ${round}/${MAX_ROUNDS})"
+                else echo "## 🔍 Inspector: ❌ fail. Fix rounds exhausted, needs a human"; fi ;;
+              error) echo "## 🔍 Inspector: ⚠️ review did not finish" ;;
+            esac
+            echo
+            echo "| Secret scan | Install | Lint | Test | Build | Audit | Review |"
+            echo "|---|---|---|---|---|---|---|"
+            echo "| $(icon "$C_SECRETS") | $(icon "$C_INSTALL") | $(icon "$C_LINT") | $(icon "$C_TEST") | $(icon "$C_BUILD") | $(icon "$C_AUDIT") | $(icon "${REVIEW_OUTCOME:-skipped}") |"
+            echo
+            if [ -n "$REVIEW_JSON" ]; then
+              echo "**Review summary:** $(jq -r '.summary' <<<"$REVIEW_JSON")"
+              echo
+              jq -r '.findings[] | "- **\(.severity)** `\(.file)`\(if .criterion then " (\(.criterion))" else "" end): \(.problem)\n  - Fix: \(.fix)"' <<<"$REVIEW_JSON"
+              echo
+            fi
+            for c in secrets install lint test build audit; do
+              v="C_${c^^}"
+              if [ "${!v}" != "success" ] && [ "${!v}" != "skipped" ] && [ -f "$RUNNER_TEMP/logs/$c.log" ]; then
+                echo "<details><summary>${c} log (last 60 lines)</summary>"
+                echo
+                echo '```'
+                tail -n 60 "$RUNNER_TEMP/logs/$c.log"
+                echo '```'
+                echo "</details>"
+                echo
+              fi
+            done
+            echo "Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > "$body"
+
+          GH_TOKEN="$BOT_TOKEN" gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$body"
+
+          # Only Factory PRs drive the pipeline; other PRs just get the report and a red or green check.
+          if [[ "$HEAD_REF" != factory/* ]]; then
+            [ "$verdict" = pass ] && exit 0
+            exit 1
+          fi
+
+          export GH_TOKEN="$PAT"
+          [ -n "$GH_TOKEN" ] || { echo "::error::Missing secret GREENLIGHT_TOKEN"; exit 1; }
+          pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${PR}"
+          stuck() {
+            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "🔍 **Inspector:** $1 ${pr_url}"
+            gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
+          }
+
+          case "$verdict" in
+            pass)
+              if [ "$AUTO_MERGE" = "true" ]; then
+                if [ "$IS_DRAFT" = "true" ]; then gh pr ready "$PR" --repo "$GITHUB_REPOSITORY"; fi
+                # Merging with the PAT makes the push to main trigger the Publisher (deploy.yml).
+                gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --match-head-commit "$HEAD_SHA"
+                gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+                  --body "🔍 **Inspector:** passed and merged ${pr_url}. The Publisher deploys next."
+              else
+                gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+                  --body "🔍 **Inspector:** passed ${pr_url}. Merge it to deploy (AUTO_MERGE is off)."
+              fi
+              ;;
+            fail)
+              if [ "$prev_fails" -lt "$MAX_ROUNDS" ]; then
+                gh api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=greenlight-fix \
+                  -f "client_payload[pr]=$PR" -f "client_payload[round]=$round" \
+                  -f "client_payload[greenlight_repo]=$GREENLIGHT_REPO" -f "client_payload[issue]=$GREENLIGHT_ISSUE"
+                echo "Dispatched Factory fix round $round"
+              else
+                stuck "failed ${MAX_ROUNDS} fix rounds and needs a human."
+              fi
+              exit 1
+              ;;
+            error)
+              stuck "the AI review did not finish (usage limit or max turns?). Re-run the Inspector workflow on"
+              exit 1
+              ;;
+          esac

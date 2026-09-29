@@ -1,0 +1,178 @@
+# Publisher: every push to main (normally the Inspector's merge) goes to Cloudflare Pages,
+# then gets smoke-tested and reported to the greenlight issue. No AI.
+#
+#   gate    (PAT)                 skip until the product has actually been built (issue state), or
+#                                 when the Cloudflare secrets are missing
+#   build   (no secrets)          npm ci + vite build, dist/ uploaded as an artifact
+#   deploy  (Cloudflare token)    never runs repository code: `npm ci --ignore-scripts` (for Function
+#                                 dependencies only) + a pinned wrangler outside the repo
+#   report  (PAT)                 comments the live URL and labels "live", or "stuck" on failure
+name: Publisher
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  GREENLIGHT_REPO: ${{ vars.GREENLIGHT_REPO }}
+  GREENLIGHT_ISSUE: ${{ vars.GREENLIGHT_ISSUE }}
+  WRANGLER_VERSION: 4.143.1
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
+      state: ${{ steps.gate.outputs.state }}
+    steps:
+      - name: Decide whether to deploy
+        id: gate
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          state=""
+          if [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ]; then
+            state=$(gh issue view "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --json labels \
+              --jq '[.labels[].name | select(IN("idea","approved","blueprint-ready","blueprint-ok","building","live","stuck","archived"))] | join(",")')
+          fi
+          echo "state=$state" >> "$GITHUB_OUTPUT"
+          deploy=true
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
+            echo "::notice::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID not set in this repo, so skipping deploy"
+            deploy=false
+          elif [ "$GITHUB_EVENT_NAME" != "workflow_dispatch" ] && ! grep -qE '(^|,)(building|live|stuck)(,|$)' <<<"$state"; then
+            # Scaffold and blueprint commits land on main before anything is built.
+            echo "::notice::Greenlight issue state is '${state:-unknown}', so it isn't built yet and deploy is skipped (run this workflow by hand to force it)"
+            deploy=false
+          fi
+          echo "deploy=$deploy" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: dist
+          path: dist/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
+
+  deploy:
+    needs: [gate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          package-manager-cache: false
+
+      - name: Install Function dependencies (no install scripts)
+        run: npm ci --ignore-scripts
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: dist
+          path: dist
+
+      - name: Install wrangler (outside the repo)
+        run: npm install --prefix "$RUNNER_TEMP/wrangler" --no-audit --no-fund "wrangler@${WRANGLER_VERSION}"
+
+      - name: Deploy to Cloudflare Pages
+        id: deploy
+        run: |
+          wrangler="$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler"
+          name=$(sed -nE 's/^name[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' wrangler.toml | head -n1)
+          [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,57}$ ]] || { echo "::error::invalid Pages project name '$name' in wrangler.toml"; exit 1; }
+          api="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${name}"
+          project() { curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$api"; }
+
+          if [ "$(project | jq -r '.success')" != "true" ]; then
+            echo "Creating Pages project $name"
+            "$wrangler" pages project create "$name" --production-branch main
+          fi
+
+          "$wrangler" pages deploy dist --project-name "$name" --branch main \
+            --commit-hash "$GITHUB_SHA" --commit-message "$(git log -1 --format=%s | cut -c1-200)"
+
+          subdomain=$(project | jq -r '.result.subdomain // empty')
+          [ -n "$subdomain" ] || { echo "::error::could not read the project's pages.dev subdomain"; exit 1; }
+          echo "url=https://${subdomain}" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke test
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          # New pages.dev subdomains can take a few minutes to resolve.
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 10 "$URL/api/health" | jq -e '.ok == true' >/dev/null \
+              && curl -fsS --max-time 10 -o /dev/null "$URL/"; then
+              echo "Smoke test passed on attempt $i: $URL"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::$URL/api/health did not return { ok: true } within 5 minutes"
+          exit 1
+
+  report:
+    needs: [gate, build, deploy]
+    if: always() && needs.gate.outputs.deploy == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Report to greenlight issue
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          STATE: ${{ needs.gate.outputs.state }}
+          RESULT: ${{ needs.deploy.result }}
+          URL: ${{ needs.deploy.outputs.url }}
+        run: |
+          [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ] || { echo "No greenlight issue to report to"; exit 0; }
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ "$RESULT" = "success" ]; then
+            # Redeploys of an already-live product stay quiet.
+            if ! grep -qE '(^|,)live(,|$)' <<<"$STATE"; then
+              gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+                --body "🚀 **Publisher:** live at ${URL} (smoke test passed on \`/api/health\`). Commit \`${GITHUB_SHA:0:7}\`, run: ${run_url}"
+              gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label live --remove-label building --remove-label stuck
+            fi
+          else
+            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
+              --body "🚀 **Publisher:** deploy or smoke test failed. Run: ${run_url}"
+            gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
+            exit 1
+          fi

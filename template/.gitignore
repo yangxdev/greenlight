@@ -24,3 +24,6 @@ coverage
 .idea
 .DS_Store
 *.sw?
+
+# Scratch space used by Greenlight workflows at run time
+.greenlight-run/
