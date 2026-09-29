@@ -1,0 +1,215 @@
+# Observer: weekly portfolio report.
+#
+#   metrics  (no AI)         observer/ scripts: uptime history, Cloudflare Web Analytics, blueprint success metrics,
+#                            board state -> metrics.json. Holds the credentials; runs only greenlight's own code.
+#   report   (AI, no PAT)    Claude writes reports/<week>.md and returns a verdict per product (JSON)
+#   publish  (no AI)         commits reports/, comments the summary on the "Greenlight weekly reports" issue, and
+#                            comments on a product's issue only when its verdict changes. Never changes labels.
+#
+# With no live products the AI step is skipped and publish writes a short board-only report itself.
+name: Observer
+
+on:
+  schedule:
+    - cron: "47 4 * * 1" # Mondays 04:47 UTC, before that day's Scout and Ideas runs (the Analyst reads the report)
+  workflow_dispatch:
+
+concurrency:
+  group: observer
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  metrics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      week: ${{ steps.metrics.outputs.week }}
+      products: ${{ steps.metrics.outputs.products }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: observer
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: observer/package-lock.json
+
+      - name: Collect metrics
+        id: metrics
+        working-directory: observer
+        env:
+          GREENLIGHT_REPO: ${{ github.repository }}
+          # The PAT can read private product repos (blueprint success metrics); github.token cannot.
+          GITHUB_TOKEN: ${{ secrets.GREENLIGHT_TOKEN || github.token }}
+          MONGODB_URI: ${{ secrets.MONGODB_URI }}
+          MONGODB_DB: ${{ vars.MONGODB_DB || 'greenlight' }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npm ci --omit=dev
+          mkdir -p "$RUNNER_TEMP/observer"
+          node src/cli.ts metrics --out "$RUNNER_TEMP/observer/metrics.json"
+          {
+            echo "week=$(jq -r .week "$RUNNER_TEMP/observer/metrics.json")"
+            echo "products=$(jq '.products | length' "$RUNNER_TEMP/observer/metrics.json")"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: metrics
+          path: ${{ runner.temp }}/observer/metrics.json
+          retention-days: 30
+
+  report:
+    needs: metrics
+    if: needs.metrics.outputs.products != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: metrics
+          path: .greenlight-run
+
+      - name: Write weekly report
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Observer. Your role instructions are in .claude/agents/observer.md.
+            Read them first and follow them exactly.
+
+            Inputs: .greenlight-run/metrics.json, compass.md, templates/weekly-report.md, and reports/*.md if any exist.
+            Write reports/${{ needs.metrics.outputs.week }}.md, then return the structured result.
+            Do not create or modify any other file.
+          claude_args: >-
+            --max-turns ${{ vars.OBSERVER_MAX_TURNS || '12' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["summary","products"],"properties":{"summary":{"type":"string"},"products":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["issue","verdict","reason","suggestion"],"properties":{"issue":{"type":"integer"},"verdict":{"type":"string","enum":["keep","improve","archive"]},"reason":{"type":"string"},"suggestion":{"type":"string"}}}}}}'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: report
+          path: reports/${{ needs.metrics.outputs.week }}.md
+          if-no-files-found: error
+          retention-days: 30
+
+  publish:
+    needs: [metrics, report]
+    if: always() && needs.metrics.result == 'success' && needs.report.result != 'failure' && needs.report.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      issues: write
+    env:
+      WEEK: ${{ needs.metrics.outputs.week }}
+      RESULT: ${{ needs.report.outputs.result }}
+      GH_TOKEN: ${{ github.token }}
+      TRACKING_TITLE: Greenlight weekly reports
+    steps:
+      # This job runs no repository code (only git, gh and jq), so the checkout may keep its token for the push.
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: metrics
+          path: ${{ runner.temp }}/observer
+
+      - uses: actions/download-artifact@v8
+        if: needs.report.result == 'success'
+        with:
+          name: report
+          path: reports
+
+      - name: Write board-only report (no live products)
+        if: needs.report.result == 'skipped'
+        run: |
+          mkdir -p reports
+          jq -r '
+            "# Weekly report: \(.week)\n",
+            "_No live products yet, so this is a board-only report written without AI._\n",
+            "## Pipeline\n",
+            "- Ideas filed this week: \(.board.ideasFiledThisWeek)",
+            "- Open by state: \(.board.counts | to_entries | map("\(.key) \(.value)") | join(" · "))",
+            (if (.board.stuck | length) > 0 then "- Stuck: \(.board.stuck | map("#\(.issue) \(.title)") | join(", "))" else "- Stuck: none" end),
+            (if (.notes | length) > 0 then "\n## Data notes\n\n" + (.notes | map("- " + .) | join("\n")) else empty end)
+          ' "$RUNNER_TEMP/observer/metrics.json" > "reports/$WEEK.md"
+
+      - name: Save verdicts
+        if: needs.report.result == 'success'
+        run: |
+          [ -n "$RESULT" ] || { echo "::error::The Observer returned no structured result"; exit 1; }
+          jq --arg week "$WEEK" '{week: $week, summary, products}' <<<"$RESULT" > "reports/$WEEK.json"
+
+      - name: Commit reports
+        run: |
+          git config user.name "greenlight-observer"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add reports/
+          if git diff --cached --quiet; then echo "Nothing new to commit"; exit 0; fi
+          git commit -m "report: $WEEK"
+          for attempt in 1 2 3; do
+            git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && exit 0
+            sleep $((attempt * 5))
+          done
+          exit 1
+
+      - name: Post to the board
+        run: |
+          set -euo pipefail
+          report_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/reports/${WEEK}.md"
+
+          # One long-lived tracking issue collects the weekly summaries (pin it once by hand).
+          tracking=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$TRACKING_TITLE\" in:title" \
+            --json number,title --jq ".[] | select(.title == \"$TRACKING_TITLE\") | .number" | head -n1)
+          if [ -z "$tracking" ]; then
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$TRACKING_TITLE" \
+              --body "The Observer posts a summary here every Monday. Full reports live in \`reports/\`. Pin this issue.")
+            tracking=${url##*/}
+          fi
+          if [ -n "$RESULT" ]; then summary=$(jq -r .summary <<<"$RESULT"); else summary="No live products yet; board-only report."; fi
+          gh issue comment "$tracking" --repo "$GITHUB_REPOSITORY" \
+            --body "📊 **Observer, ${WEEK}:** ${summary}"$'\n\n'"Full report: ${report_url}"
+
+          [ -n "$RESULT" ] || exit 0
+          # Comment on a product's issue only when its verdict changed since the last report. Labels are never touched.
+          previous=$(find reports -name '*.json' ! -name "$WEEK.json" | sort | tail -n1)
+          jq -c '.products[]' <<<"$RESULT" | while read -r p; do
+            issue=$(jq -r .issue <<<"$p")
+            verdict=$(jq -r .verdict <<<"$p")
+            before=""
+            if [ -n "$previous" ]; then
+              before=$(jq -r --argjson n "$issue" '.products[] | select(.issue == $n) | .verdict' "$previous")
+            fi
+            if [ "$verdict" = "$before" ] || { [ -z "$before" ] && [ "$verdict" = "keep" ]; }; then continue; fi
+            body="📈 **Observer:** verdict **${verdict}**"
+            if [ -n "$before" ]; then body+=" (was ${before})"; fi
+            body+=$'\n\n'"$(jq -r .reason <<<"$p")"
+            suggestion=$(jq -r .suggestion <<<"$p")
+            if [ -n "$suggestion" ]; then body+=$'\n\n'"**Suggestion:** ${suggestion}"; fi
+            if [ "$verdict" = "archive" ]; then
+              body+=$'\n\n'"To archive: close the issue and set the \`archived\` label. That decision stays yours."
+            fi
+            body+=$'\n\n'"Report: ${report_url}"
+            gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
+            echo "Commented on #$issue: $before -> $verdict"
+          done

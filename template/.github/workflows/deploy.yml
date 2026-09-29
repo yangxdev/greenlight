@@ -167,7 +167,7 @@ jobs:
             # Redeploys of an already-live product stay quiet.
             if ! grep -qE '(^|,)live(,|$)' <<<"$STATE"; then
               gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-                --body "🚀 **Publisher:** live at ${URL} (smoke test passed on \`/api/health\`). Commit \`${GITHUB_SHA:0:7}\`, run: ${run_url}"
+                --body "🚀 **Publisher:** live at ${URL} (smoke test passed on \`/api/health\`). Commit \`${GITHUB_SHA:0:7}\`, run: ${run_url}"$'\n\n'"<!-- greenlight:url=${URL} -->"
               gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label live --remove-label building --remove-label stuck
             fi
           else

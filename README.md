@@ -24,7 +24,7 @@ The Analyst, Critic and Architect read it.
 | 2 | Inspector, Factory fix loop, Publisher | **built** |
 | 3 | Scout | **built** (daily fetch + ranked export) |
 | 3 | Analyst, Critic | **built** (weekly `ideas.yml`) |
-| 4 | Observer | roadmap (role prompt exists in `.claude/agents/`) |
+| 4 | Observer | **built** (6-hourly uptime probes + weekly `observer.yml`) |
 
 ## Label state machine
 
@@ -69,9 +69,13 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
   factory-dispatch.yml      on label "blueprint-ok"
   template-ci.yml           keeps template/ lint/test/build green
   scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it)
-  scout-ci.yml              keeps scout/ typechecked, linted, tested
+  uptime.yml                every 6h: probe live products, store history in MongoDB
+  observer.yml              weekly: metrics -> Observer report + per-product verdicts
+  scripts-ci.yml            keeps scout/ and observer/ typechecked, linted, tested
   ideas.yml                 weekly: Analyst + Critic -> analysis/<date>*.md, at most 3 `idea` issues
 analysis/                   weekly idea cards and Critic verdicts, committed by ideas.yml
+observer/                   Observer data scripts: uptime probes, Web Analytics, weekly metrics.json (see observer/README.md)
+reports/                    weekly reports (<week>.md) and verdicts (<week>.json), committed by observer.yml
 scout/                      Scout: HN, Reddit, GitHub, Product Hunt, RSS fetchers + ranked export (see scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
@@ -128,6 +132,16 @@ snapshot.
    `wrangler pages deploy`, smoke-tests `https://<project>.pages.dev/api/health` and `/`, comments the live URL, and
    sets `live`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
    Cloudflare secrets are missing.
+8. **Observer**:
+   - `uptime.yml` (every 6 hours, no AI) probes each `live` product's `/api/health` and `/` and stores the result in
+     MongoDB, kept 35 days;
+   - `observer.yml` (Mondays, before Ideas) collects the week's uptime, Cloudflare Web Analytics visits (this week vs
+     last), each blueprint's success metric and the board state;
+   - Claude writes `reports/<week>.md` with a keep, improve or archive verdict per product;
+   - a shell job commits it and comments the summary on the **Greenlight weekly reports** issue. It comments on a
+     product's issue only when its verdict changes, and never touches labels;
+   - the next Analyst run reads the report's "Signals for the Analyst". With nothing live, the AI step is skipped and a
+     board-only report is written instead.
 
 Things the Factory can't do for you are listed under "Manual setup required" in the PR's build report: creating an R2
 bucket, `wrangler pages secret put MONGODB_URI`, and Atlas network access.
@@ -142,6 +156,8 @@ The Pro plan's usage limits are the real budget:
   Worst case per product is about 1 Architect + 1 build + 4 reviews + 3 fixes.
 - **Weekly idea generation is two short runs:** the Analyst (about 20 turns over about 30k tokens of signals) and the
   Critic (about 15 turns). With no Scout signals, both are skipped.
+- **The weekly Observer is one short run** (about 12 turns over a small `metrics.json`), and it's skipped while nothing is live.
+  `uptime.yml` exits in seconds when MongoDB isn't set or nothing is live. Otherwise it costs about 4 × 1 billed minute a day.
 - **The AI review only runs when deterministic checks pass.** A red check goes back to the Factory with the log, without
   spending a review.
 - **No AI in deterministic steps.** Repo creation, secrets, validation, checks, pushes, PRs and labels are all shell.
@@ -157,6 +173,7 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 | Workflow | AI / repo-code jobs (no PAT) | Credentialed jobs (no AI, no repo code) |
 |----------|------------------------------|-----------------------------------------|
 | Ideas | `analyst`, `critic` (artifacts + JSON verdict out) | `export` (MongoDB), `publish` (`GITHUB_TOKEN` only) |
+| Observer | `report` (report + JSON verdicts out) | `metrics` (PAT read, Cloudflare, MongoDB), `publish` (`GITHUB_TOKEN` only) |
 | Architect | `blueprint` (artifact out: blueprint.md) | `scaffold`, `publish` |
 | Factory | `agent` (git bundle out), `verify` | `prepare`, `publish` |
 | Inspector | `checks`, `review` (JSON verdict out) | `decide` |
@@ -209,7 +226,7 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 |--------|-------|-------|
 | `CLAUDE_CODE_OAUTH_TOKEN` | output of `claude setup-token` | 1 |
 | `GREENLIGHT_TOKEN` | the fine-grained PAT | 1 |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → custom token with **Account › Cloudflare Pages › Edit** | 2 |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → custom token with **Account › Cloudflare Pages › Edit** and **Account › Account Analytics › Read** (for the Observer) | 2, 4 |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID | 2 |
 
 The Architect copies all four into each product repo it creates. Product repos created before you add a secret need it
@@ -231,7 +248,7 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`private`|`public`, default `private`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
 `INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
-`CRITIC_MAX_TURNS` (15), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), and `CLAUDE_MODEL` (passed as `--model`;
+`CRITIC_MAX_TURNS` (15), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), and `CLAUDE_MODEL` (passed as `--model`;
 empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can
 override them there per product.
 
@@ -266,15 +283,19 @@ username in `userAgent` and pick subreddits and feeds where your target users ta
 2. Actions → **Ideas** → *Run workflow*. It works without MongoDB too, using a fresh fetch. Expect 0–3 new `idea`
    issues and an `analysis/<date>.md` commit. An empty week is normal while `compass.md` is still generic.
 3. Add `approved` to an idea you like to start the Architect.
+4. Once something is `live`: in Cloudflare, open Workers & Pages → the project → **Metrics** → enable **Web Analytics**
+   (free, no code change). Then run Actions → **Observer** by hand once and pin the **Greenlight weekly reports** issue
+   it creates. If the report notes "no Web Analytics site for …", copy the site tag from the Web Analytics dashboard
+   URL into `observer/config.json` → `siteTags`.
 
 ## Roadmap
 
-### Phase 4: Observer
-
-- Weekly `observer.yml`: shell steps collect uptime (curl of every `live` product's `/api/health`) and Cloudflare
-  Web Analytics numbers (GraphQL API; token needs **Account Analytics: Read**) into `observer/metrics.json`. Claude
-  with `.claude/agents/observer.md` writes `reports/<YYYY>-W<ww>.md`, which feeds the next Analyst run. A shell step
-  posts the summary as a pinned issue comment on the board.
+All nine actors exist. The next steps depend on running them for real:
+- Tune `compass.md`, `scout/config.json` (subreddits, feeds, pain phrases) and the Critic threshold based on the first
+  few weeks of `analysis/` output.
+- Key-action tracking: the Observer reports "no data" for each product's key action until products emit a counted event
+  (for example a tiny `/api/event` Function writing to MongoDB).
+- Optional: sync Project board Status from labels (needs a token with Projects access).
 
 ## Local development of the template
 

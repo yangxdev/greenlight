@@ -1,12 +1,12 @@
-# Keeps scout/ typechecked, linted and tested. No AI, no network in tests.
-name: Scout CI
+# Keeps the no-AI script packages (scout/, observer/) typechecked, linted and tested. No network in tests.
+name: Scripts CI
 
 on:
   push:
     branches: [main]
-    paths: ["scout/**", ".github/workflows/scout-ci.yml"]
+    paths: ["scout/**", "observer/**", ".github/workflows/scripts-ci.yml"]
   pull_request:
-    paths: ["scout/**", ".github/workflows/scout-ci.yml"]
+    paths: ["scout/**", "observer/**", ".github/workflows/scripts-ci.yml"]
 
 permissions:
   contents: read
@@ -15,9 +15,13 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        package: [scout, observer]
     defaults:
       run:
-        working-directory: scout
+        working-directory: ${{ matrix.package }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -26,7 +30,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: scout/package-lock.json
+          cache-dependency-path: ${{ matrix.package }}/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run lint

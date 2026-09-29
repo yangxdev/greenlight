@@ -1,0 +1,30 @@
+{
+  "name": "greenlight-observer",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Greenlight Observer data scripts: uptime probes and weekly metrics. No AI.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "probe": "node src/cli.ts probe",
+    "metrics": "node src/cli.ts metrics",
+    "typecheck": "tsc",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm run lint && npm test"
+  },
+  "dependencies": {
+    "mongodb": "^7.7.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.4",
+    "eslint": "^10.11.0",
+    "globals": "^17.12.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.0",
+    "vitest": "^5.0.2"
+  }
+}

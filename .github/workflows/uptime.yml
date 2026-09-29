@@ -1,0 +1,62 @@
+# Uptime: probes every live product every 6 hours and stores the results in MongoDB for the Observer.
+# No AI. Exits early (in seconds) when MongoDB isn't configured or nothing is live.
+name: Uptime
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: uptime
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  issues: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      MONGODB_DB: ${{ vars.MONGODB_DB || 'greenlight' }}
+      GREENLIGHT_REPO: ${{ github.repository }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - name: Anything to probe?
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          live=$(gh issue list --repo "$GITHUB_REPOSITORY" --label live --state open --json number --jq length)
+          if [ -z "$MONGODB_URI" ]; then
+            echo "::notice::MONGODB_URI is not set, so there's nowhere to keep uptime history; skipping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif [ "$live" = "0" ]; then
+            echo "No live products; skipping"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.gate.outputs.run == 'true'
+        with:
+          persist-credentials: false
+          sparse-checkout: observer
+
+      - uses: actions/setup-node@v7
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: observer/package-lock.json
+
+      - name: Probe
+        if: steps.gate.outputs.run == 'true'
+        working-directory: observer
+        run: |
+          npm ci --omit=dev
+          node src/cli.ts probe
