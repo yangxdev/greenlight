@@ -21,7 +21,8 @@ If you are the Factory, the blueprint decides *what* to build and this file deci
 
 Don't add a UI kit, CSS-in-JS, icon set, font, ORM or state library. Approved when the blueprint needs them:
 `react-router` (more than one screen), RTK Query (`createApi`, for server data with caching), `zod` (validating API
-input), `i18next` + `react-i18next` (more than one language). Fewer dependencies is better.
+input), `i18next` + `react-i18next` + language detector (more than one language), and PWA basics (a web manifest and
+icons in `public/`, plus a hand-written service worker only if offline use matters). Fewer dependencies is better.
 
 ## Folder structure
 

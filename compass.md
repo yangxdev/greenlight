@@ -23,7 +23,18 @@ The agents treat every line here as a hard constraint unless it says "prefer".
 - Data: MongoDB Atlas free tier (M0), official driver, one client per request. D1 is the fallback.
 - Files: Cloudflare R2.
 - Hosting/CI: Cloudflare Workers (`*.workers.dev`), GitHub Actions.
-- Tests: Vitest + Testing Library. Lint: ESLint.
+- Tests: Vitest + Testing Library. Lint: ESLint. Format: Prettier.
+- Fonts: Geist + Geist Mono (`@fontsource-variable`). Icons: Lucide via `react-icons/lu`. No other fonts or icon sets.
+
+Approved only when the product needs them (the blueprint says which and why):
+
+- Routing: `react-router` v7, when there is more than one screen.
+- Server data: RTK Query (`createApi`), for fetching and caching instead of hand-written thunks.
+- Validation: `zod`, for API input with more than a couple of fields.
+- Languages: `i18next` + `react-i18next` + browser language detector, when more than one language is in scope
+  (waypoint ships English and Italian).
+- Installable app: web manifest + icons, plus a hand-written service worker only if offline use matters, when
+  "use it on my phone" is part of the pitch.
 
 ## Look & feel
 
