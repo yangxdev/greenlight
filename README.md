@@ -5,10 +5,10 @@ on €0 beyond a Claude Pro plan. Everything runs on personal accounts using onl
 (Issues, Projects, Actions), Cloudflare Workers/R2/Web Analytics, and MongoDB Atlas M0.
 
 ```
- Scout ──► Analyst ──► Critic ──► Board ──► Architect ──► Factory ──► Inspector ──► Publisher ──► Observer
- (scripts)   (AI)       (AI)     (issues)     (AI)          (AI)      (AI+checks)    (no AI)        (AI)
-                                    ▲    human gates:  approved      blueprint-ok                    │
-                                    └────────────────────── weekly-report.md ◄────────────────────────┘
+ Scout ──► Analyst ──► Critic ──► Board ──► Architect ──► Reviewer ──► Factory ──► Inspector ──► Publisher ──► Observer
+ (scripts)   (AI)       (AI)     (issues)     (AI)          (AI)         (AI)      (AI+checks)    (no AI)        (AI)
+                                    ▲    human gates:  approved                   blueprint-ok                   │
+                                    └──────────────────────────── weekly-report.md ◄─────────────────────────────┘
 ```
 
 Stages hand off through **markdown files and labels, not chat**: idea cards (`templates/idea.md`), blueprints
@@ -45,7 +45,7 @@ any state ──🧑──► archived
 |-------|--------|-----------------------------|
 | `idea` | issue template (you) · Critic (`ideas.yml`, weekly) | Idea card waiting for review |
 | `approved` | **you** | `architect.yml` creates the product repo, writes `blueprint.md`, comments the link |
-| `blueprint-ready` | Architect | Review/edit `blueprint.md` in the product repo |
+| `blueprint-ready` | Architect | Read the Reviewer's summary on the issue; edit `blueprint.md` if needed |
 | `blueprint-ok` | **you** | `factory-dispatch.yml` checks nothing else is `building`, then triggers the product's Factory |
 | `building` | factory-dispatch | The Factory is implementing the blueprint. **Only one issue at a time.** |
 | `live` | Publisher | Deployed to `<name>.<you>.workers.dev` and `/api/health` answered `{ ok: true }` |
@@ -61,7 +61,7 @@ To regenerate a blueprint, comment your feedback on the issue (your comments are
 ```
 compass.md                  your interests, stack, no-go list, definition of "good"
 templates/                  idea.md, blueprint.md, weekly-report.md (handoff formats)
-.claude/agents/             analyst.md, critic.md, architect.md, observer.md (role prompts)
+.claude/agents/             analyst.md, critic.md, architect.md, blueprint-reviewer.md, observer.md (role prompts)
 .github/ISSUE_TEMPLATE/     idea.yml (hand-write ideas)
 .github/workflows/
   setup-labels.yml          run once: creates the state labels
@@ -114,9 +114,16 @@ snapshot.
      if present, the Cloudflare secrets into the product repo, and sets the variables `GREENLIGHT_REPO`/`GREENLIGHT_ISSUE`;
    - `blueprint` (AI): Claude reads `compass.md`, the issue (plus your comments) and `templates/blueprint.md`, and
      writes only `blueprint.md`, which leaves the job as an artifact;
-   - `publish` (no AI) checks the blueprint (required sections, 1–10 tasks), commits it, comments the link with a
+   - `review` (AI, fresh context, about 20 turns): the **Blueprint Reviewer** checks the draft against a fixed
+     checklist (`.claude/agents/blueprint-reviewer.md`): nothing unverified goes live as fact, no task needs what the
+     Factory can't do, nothing hard-coded breaks on the first contribution, the template contract holds, every
+     criterion is a test, the idea's core pain is still in scope, the compass. It fixes what it can in place and
+     returns a verdict (`ready` / `needs-owner`) with its changes and open concerns;
+   - `publish` (no AI) checks the blueprint (required sections, 1–10 tasks; the Architect's draft is used if the
+     review failed or broke it), commits it, comments the link, the Reviewer's changes and concerns, and a
      `<!-- greenlight:repo=owner/name -->` marker, and sets the label to `blueprint-ready`.
-3. **You** review `blueprint.md` in the product repo (edit it freely) and add `blueprint-ok`.
+3. **You** read the Reviewer's summary (and `blueprint.md` if you like; edit it freely) and add `blueprint-ok`.
+   This gate is deliberately yours: it is the one decision that spends a build.
 4. **Factory dispatch** (`factory-dispatch.yml`, no AI) refuses if another issue is `building`, otherwise sends
    `repository_dispatch: greenlight-build` to the product repo and sets the label to `building`.
 5. **Factory** (`factory.yml` in the product repo, about 80 turns max). Claude implements the tasks in order, runs
@@ -154,9 +161,9 @@ bucket, `npx wrangler secret put MONGODB_URI`, and Atlas network access.
 The Pro plan's usage limits are the real budget:
 
 - **One build at a time.** factory-dispatch checks the `building` label.
-- **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
-  `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
-  Worst case per product is about 1 Architect + 1 build + 4 reviews + 3 fixes.
+- **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80),
+  `FIX_MAX_TURNS` (40), `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
+  Worst case per product is about 1 Architect + 1 blueprint review + 1 build + 4 reviews + 3 fixes.
 - **Weekly idea generation is two short runs:** the Analyst (about 20 turns over about 30k tokens of signals) and the
   Critic (about 15 turns). With no Scout signals, both are skipped.
 - **The weekly Observer is one short run** (about 12 turns over a small `metrics.json`), and it's skipped while nothing is live.
@@ -177,7 +184,7 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 |----------|------------------------------|-----------------------------------------|
 | Ideas | `analyst`, `critic` (artifacts + JSON verdict out) | `export` (MongoDB), `publish` (`GITHUB_TOKEN` only) |
 | Observer | `report` (report + JSON verdicts out) | `metrics` (PAT read, Cloudflare, MongoDB), `publish` (`GITHUB_TOKEN` only) |
-| Architect | `blueprint` (artifact out: blueprint.md) | `scaffold`, `publish` |
+| Architect | `blueprint`, `review` (artifacts out: blueprint.md; JSON review out) | `scaffold`, `publish` |
 | Factory | `agent` (git bundle out), `verify` | `prepare`, `publish` |
 | Inspector | `checks`, `review` (JSON verdict out) | `decide` |
 | Publisher | `build` (dist/ out) | `gate`, `deploy` (`npm ci --ignore-scripts`, wrangler installed outside the repo), `report` |
@@ -250,7 +257,7 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 512 MB.
 
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`private`|`public`, default `private`),
-`PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
+`PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
 `INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
 `CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), and `CLAUDE_MODEL` (passed as `--model`;
 empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can

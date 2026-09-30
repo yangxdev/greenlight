@@ -1,10 +1,13 @@
 # Architect: when an issue gets the "approved" label, create the product repo from template/,
-# have Claude write blueprint.md, then hand back to the human with "blueprint-ready".
+# have Claude write blueprint.md, have a second Claude review and repair it, then hand back to the human
+# with "blueprint-ready" and a summary of the review.
 #
-# Security model: the AI job never shares a runner with GREENLIGHT_TOKEN.
+# Security model: no AI job shares a runner with GREENLIGHT_TOKEN.
 #   scaffold  (PAT, no AI)    create/reuse the product repo, copy secrets, export context
 #   blueprint (AI, no PAT)    Claude writes blueprint.md, uploaded as an artifact
-#   publish   (PAT, no AI)    validate the file, commit it, comment, relabel
+#   review    (AI, no PAT)    a fresh Claude checks it against a checklist, edits it, returns a JSON summary
+#   publish   (PAT, no AI)    validate the file (the Architect's version if the review failed or broke it),
+#                             commit it, comment with the review, relabel
 name: Architect
 
 on:
@@ -202,8 +205,79 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  publish:
+      - uses: actions/upload-artifact@v7
+        with:
+          name: idea
+          path: .greenlight-run/issue.md
+          if-no-files-found: error
+          retention-days: 1
+
+  review:
     needs: [scaffold, blueprint]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: product-context
+          path: product
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: blueprint
+          path: ${{ runner.temp }}/draft
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: idea
+          path: .greenlight-run
+
+      - name: Put the new draft in place
+        # product-context may hold the previous blueprint; the review is of this run's draft.
+        run: cp "$RUNNER_TEMP/draft/blueprint.md" product/blueprint.md
+
+      - name: Review blueprint
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Blueprint Reviewer. Your role instructions are in .claude/agents/blueprint-reviewer.md.
+            Read them first and follow them exactly.
+
+            Inputs:
+            - product/blueprint.md: the Architect's blueprint for ${{ needs.scaffold.outputs.full }}. Edit it in place.
+            - .greenlight-run/issue.md: the approved idea (issue #${{ github.event.issue.number }}) and owner clarifications
+            - compass.md, templates/blueprint.md, .claude/agents/architect.md
+            - product/CLAUDE.md and product/package.json
+
+            Edit only product/blueprint.md, then return the structured result.
+          claude_args: >-
+            --max-turns ${{ vars.REVIEWER_MAX_TURNS || '20' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","changes","concerns"],"properties":{"verdict":{"type":"string","enum":["ready","needs-owner"]},"changes":{"type":"array","maxItems":15,"items":{"type":"string","maxLength":300}},"concerns":{"type":"array","maxItems":10,"items":{"type":"string","maxLength":300}}}}'
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: blueprint-reviewed
+          path: product/blueprint.md
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: [scaffold, blueprint, review]
+    # A failed review must not block the blueprint: publish falls back to the Architect's draft and says so.
+    if: always() && needs.scaffold.result == 'success' && needs.blueprint.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -215,18 +289,42 @@ jobs:
       - uses: actions/download-artifact@v8
         with:
           name: blueprint
-          path: ${{ runner.temp }}/blueprint
+          path: ${{ runner.temp }}/draft
+
+      - uses: actions/download-artifact@v8
+        if: needs.review.result == 'success'
+        continue-on-error: true
+        with:
+          name: blueprint-reviewed
+          path: ${{ runner.temp }}/reviewed
 
       - name: Validate blueprint
+        id: validate
+        env:
+          REVIEW_RESULT: ${{ needs.review.result }}
         run: |
-          bp="$RUNNER_TEMP/blueprint/blueprint.md"
-          [ -s "$bp" ] || { echo "::error::blueprint.md is empty"; exit 1; }
-          for heading in '## Scope' '## Data model' '## Routes' '## Tasks' '## Acceptance criteria' '## Non-goals'; do
-            grep -qF "$heading" "$bp" || { echo "::error::blueprint.md is missing section '$heading'"; exit 1; }
-          done
-          tasks=$(grep -cE '^### Task [0-9]+' "$bp" || true)
-          if [ "$tasks" -lt 1 ] || [ "$tasks" -gt 10 ]; then
-            echo "::error::blueprint.md must have 1-10 tasks ('### Task N: ...'), found $tasks"; exit 1
+          validate() {
+            local bp="$1"
+            [ -s "$bp" ] || { echo "::warning::$bp is empty"; return 1; }
+            for heading in '## Scope' '## Data model' '## Routes' '## Tasks' '## Acceptance criteria' '## Non-goals'; do
+              grep -qF "$heading" "$bp" || { echo "::warning::$bp is missing section '$heading'"; return 1; }
+            done
+            local tasks
+            tasks=$(grep -cE '^### Task [0-9]+' "$bp" || true)
+            if [ "$tasks" -lt 1 ] || [ "$tasks" -gt 10 ]; then
+              echo "::warning::$bp must have 1-10 tasks ('### Task N: ...'), found $tasks"; return 1
+            fi
+          }
+          mkdir -p "$RUNNER_TEMP/blueprint"
+          if [ "$REVIEW_RESULT" = "success" ] && validate "$RUNNER_TEMP/reviewed/blueprint.md"; then
+            cp "$RUNNER_TEMP/reviewed/blueprint.md" "$RUNNER_TEMP/blueprint/blueprint.md"
+            echo "reviewed=true" >> "$GITHUB_OUTPUT"
+          elif validate "$RUNNER_TEMP/draft/blueprint.md"; then
+            echo "::warning::Publishing the Architect's unreviewed draft (review: $REVIEW_RESULT)"
+            cp "$RUNNER_TEMP/draft/blueprint.md" "$RUNNER_TEMP/blueprint/blueprint.md"
+            echo "reviewed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::blueprint.md failed validation"; exit 1
           fi
 
       - name: Commit blueprint to product repo
@@ -248,14 +346,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.commit.outputs.sha }}
+          REVIEWED: ${{ steps.validate.outputs.reviewed }}
+          REVIEW_JSON: ${{ needs.review.outputs.result }}
         run: |
           tasks=$(grep -E '^### Task [0-9]+' "$RUNNER_TEMP/blueprint/blueprint.md" | sed -E 's/^### /- /')
+          # The review quotes an idea built from internet text: defuse @mentions like the Ideas publisher does.
+          defuse() { sed -E 's/@/@\xE2\x80\x8B/g'; }
+          if [ "$REVIEWED" = "true" ] && [ -n "$REVIEW_JSON" ]; then
+            verdict=$(jq -r '.verdict' <<<"$REVIEW_JSON")
+            changes=$(jq -r '.changes[] | "- " + (gsub("[\r\n]+"; " "))' <<<"$REVIEW_JSON" | defuse)
+            concerns=$(jq -r '.concerns[] | "- " + (gsub("[\r\n]+"; " "))' <<<"$REVIEW_JSON" | defuse)
+            if [ "$verdict" = "ready" ]; then
+              headline="🔎 **Reviewer:** ready for your decision."
+            else
+              headline="🔎 **Reviewer:** needs your input before \`blueprint-ok\`."
+            fi
+            review="${headline}"$'\n\n'"**Changed in the blueprint:**"$'\n'"${changes:-- nothing}"
+            if [ -n "$concerns" ]; then review+=$'\n\n'"**For you to decide:**"$'\n'"${concerns}"; fi
+          else
+            review="⚠️ **Reviewer:** failed or broke the blueprint's structure, so this is the Architect's unreviewed draft. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          fi
           body=$(cat <<EOF
           📐 **Architect:** blueprint ready at https://github.com/${FULL}/blob/main/blueprint.md (\`${SHA}\`).
 
           ${tasks}
 
-          Review it (edit blueprint.md directly if needed), then add the \`blueprint-ok\` label to start the Factory.
+          ${review}
+
+          Add the \`blueprint-ok\` label to start the Factory (you can still edit blueprint.md first).
           To regenerate it instead, comment your feedback on this issue and re-apply \`approved\`.
 
           <!-- greenlight:repo=${FULL} -->
@@ -266,8 +384,11 @@ jobs:
             --remove-label approved --remove-label idea --remove-label stuck --add-label blueprint-ready
 
   report-failure:
-    needs: [scaffold, blueprint, publish]
-    if: failure()
+    needs: [scaffold, blueprint, review, publish]
+    # Not failure(): a failed review alone is handled by publish, which falls back to the draft.
+    if: >-
+      always() && (needs.scaffold.result == 'failure' || needs.blueprint.result == 'failure'
+      || needs.publish.result == 'failure')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

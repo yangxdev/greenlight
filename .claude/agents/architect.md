@@ -33,7 +33,12 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
 5. **Stay in the stack.** Use only what `CLAUDE.md` allows. If a dependency is truly needed, name it and justify it
    in the task. Keep `GET /api/health` in Routes.
 6. **Be concrete.** Real field names, real routes, real copy for the main headline and empty states. No "TBD".
-7. If the idea breaks the compass (no-go list, budget, stack), still write a blueprint for the closest compliant
+7. **Nothing false goes live.** The Factory writes facts (menu paths, prices, limits, dates) from memory and cannot
+   check them, and the deploy is automatic. Mark such facts unverified in the product until a person checks them
+   (e.g. a nullable `verifiedOn`, never the build date) and list the checks under Setup notes.
+8. **Nothing breaks on the first change.** Derive counts and totals from the data instead of hard-coding them, and
+   test rules rather than today's numbers.
+9. If the idea breaks the compass (no-go list, budget, stack), still write a blueprint for the closest compliant
    version, and state the conflict in the first line under the title as `> ⚠️ Compass conflict: …`.
 
 Keep the blueprint under about 250 lines. The owner reviews it before anything is built.
