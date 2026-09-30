@@ -70,9 +70,12 @@ Atlas M0's 512 MB.
 
 ## Export for the Analyst
 
-`export` takes the last `export.days` (7) of signals and ranks them:
+`export` takes the last `export.days` (7) of signals, leaves out `dropWithoutPain` channels (plain HN news,
+`hn:story`) that contain no pain phrase, and ranks the rest:
 - 60% engagement percentile within the signal's own source (comments count double),
 - 40% `painPhrases` found in title and text (capped at 3),
+- +`questionBoost` (0.25, about two pain phrases) for `questionChannels`, where people ask for tools: Ask HN,
+  Stack Exchange, r/SomebodyMakeThis, r/AppIdeas,
 - +0.1 when the same `link` shows up on several sources (they're merged, see `alsoSeenIn`).
 
 It keeps at most `export.limit` (150) signals, with no source taking more than `maxSharePerSource` (40%), and cuts

@@ -85,6 +85,11 @@
     "days": 7,
     "limit": 150,
     "maxSharePerSource": 0.4,
-    "maxTextLength": 600
+    "maxTextLength": 600,
+    "_questionChannels": "Where people ask for tools or describe problems: ranked up by questionBoost (about two pain phrases' worth). \"source\" or \"source:channel\".",
+    "questionChannels": ["hn:ask_hn", "stackexchange", "reddit:SomebodyMakeThis", "reddit:AppIdeas"],
+    "questionBoost": 0.25,
+    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement.",
+    "dropWithoutPain": ["hn:story"]
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { painScore, rankSignals, sourcePercentiles } from '../src/rank.ts'
+import { matchesChannel, painScore, rankSignals, sourcePercentiles } from '../src/rank.ts'
 import type { Signal, SourceName } from '../src/types.ts'
 
 let seq = 0
@@ -21,7 +21,15 @@ function signal(source: SourceName, patch: Partial<Signal> = {}): Signal {
   }
 }
 
-const options = { limit: 10, maxSharePerSource: 1, maxTextLength: 600, painPhrases: ['is there a tool', 'manually', 'tired of'] }
+const options = {
+  limit: 10,
+  maxSharePerSource: 1,
+  maxTextLength: 600,
+  painPhrases: ['is there a tool', 'manually', 'tired of'],
+  questionChannels: [],
+  questionBoost: 0,
+  dropWithoutPain: [],
+}
 
 describe('painScore', () => {
   it('counts distinct phrases across title and text, case-insensitively', () => {
@@ -94,6 +102,30 @@ describe('rankSignals', () => {
     const long = signal('hn', { text: 'x'.repeat(1000) })
     const [ranked] = rankSignals([long], { ...options, maxTextLength: 100 })
     expect(ranked?.text).toHaveLength(100)
+  })
+
+  it('ranks question channels up by questionBoost', () => {
+    const story = signal('hn', { channel: 'story', score: 50 })
+    const ask = signal('hn', { channel: 'ask_hn', score: 50 })
+    const ranked = rankSignals([story, ask], { ...options, questionChannels: ['hn:ask_hn'], questionBoost: 0.25 })
+    expect(ranked.map((s) => [s.id, s.rank])).toEqual([
+      [ask.id, 0.55],
+      [story.id, 0.3],
+    ])
+  })
+
+  it('drops dropWithoutPain channels unless they contain a pain phrase', () => {
+    const news = signal('hn', { channel: 'story', score: 900 })
+    const painfulNews = signal('hn', { channel: 'story', title: 'I am tired of invoices' })
+    const show = signal('hn', { channel: 'show_hn' })
+    const ranked = rankSignals([news, painfulNews, show], { ...options, dropWithoutPain: ['hn:story'] })
+    expect(ranked.map((s) => s.id).sort()).toEqual([painfulNews.id, show.id].sort())
+  })
+
+  it('matches "source" and "source:channel" patterns, channels case-insensitively', () => {
+    expect(matchesChannel({ source: 'reddit', channel: 'SomebodyMakeThis' }, ['reddit:somebodymakethis'])).toBe(true)
+    expect(matchesChannel({ source: 'stackexchange', channel: 'webapps' }, ['stackexchange'])).toBe(true)
+    expect(matchesChannel({ source: 'hn', channel: 'show_hn' }, ['hn:ask_hn', 'reddit'])).toBe(false)
   })
 
   it('returns nothing for no input', () => {

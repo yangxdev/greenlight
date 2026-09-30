@@ -5,7 +5,10 @@ import type { Signal, SourceName } from './types.ts'
 export interface RankedSignal extends Signal {
   /** Number of distinct pain phrases found in title + text. */
   painScore: number
-  /** 0..~1.2: engagement percentile within its source (60%), pain phrases (40%), +0.1 per extra source. */
+  /**
+   * Engagement percentile within its source (0.6), pain phrases (0.4), `questionBoost` for question channels,
+   * and +0.1 per extra source that discussed the same link.
+   */
   rank: number
   /** Discussion URLs of the same link on other sources (cross-source duplicates merged into this one). */
   alsoSeenIn: string[]
@@ -16,11 +19,29 @@ export interface RankOptions {
   maxSharePerSource: number
   maxTextLength: number
   painPhrases: string[]
+  /** Where people ask for tools or describe problems (`source` or `source:channel`). Ranked up by `questionBoost`. */
+  questionChannels: string[]
+  questionBoost: number
+  /** Left out unless they contain a pain phrase, e.g. `hn:story` (plain news). */
+  dropWithoutPain: string[]
 }
 
 export function painScore(signal: Pick<Signal, 'title' | 'text'>, phrases: string[]): number {
   const haystack = `${signal.title}\n${signal.text}`.toLowerCase()
   return phrases.filter((phrase) => haystack.includes(phrase)).length
+}
+
+/** `hn` matches every HN signal; `hn:ask_hn` only that channel. Channels compare case-insensitively. */
+export function matchesChannel(signal: Pick<Signal, 'source' | 'channel'>, patterns: string[]): boolean {
+  return patterns.some((pattern) => {
+    const [source, channel] = pattern.split(':')
+    return signal.source === source && (channel === undefined || channel.toLowerCase() === signal.channel.toLowerCase())
+  })
+}
+
+/** Signals `rankSignals` leaves out: a `dropWithoutPain` channel and no pain phrase. */
+export function isDroppedNoise(signal: Signal, options: Pick<RankOptions, 'painPhrases' | 'dropWithoutPain'>): boolean {
+  return matchesChannel(signal, options.dropWithoutPain) && painScore(signal, options.painPhrases) === 0
 }
 
 const engagement = (s: Signal) => s.score + 2 * s.comments
@@ -60,14 +81,17 @@ export function sourcePercentiles(signals: Signal[]): Map<string, number> {
 }
 
 /**
- * Rank, merge cross-source duplicates, and pick at most `limit` signals with no source taking more
- * than `maxSharePerSource` of the slots (unless the other sources run out).
+ * Drop `dropWithoutPain` noise, rank, merge cross-source duplicates, and pick at most `limit` signals with no
+ * source taking more than `maxSharePerSource` of the slots (unless the other sources run out).
  */
 export function rankSignals(signals: Signal[], options: RankOptions): RankedSignal[] {
-  const pct = sourcePercentiles(signals)
-  const scored: RankedSignal[] = signals.map((s) => {
+  const kept = signals.filter((s) => !isDroppedNoise(s, options))
+  const pct = sourcePercentiles(kept)
+  const scored: RankedSignal[] = kept.map((s) => {
     const pain = painScore(s, options.painPhrases)
-    return { ...s, painScore: pain, rank: 0.6 * (pct.get(s.id) ?? 0) + (0.4 * Math.min(pain, 3)) / 3, alsoSeenIn: [] }
+    const question = matchesChannel(s, options.questionChannels) ? options.questionBoost : 0
+    const rank = 0.6 * (pct.get(s.id) ?? 0) + (0.4 * Math.min(pain, 3)) / 3 + question
+    return { ...s, painScore: pain, rank, alsoSeenIn: [] }
   })
   scored.sort((a, b) => b.rank - a.rank)
 

@@ -31,6 +31,12 @@ describe('config', () => {
     expect(() => parseConfig(c)).toThrow('stackexchange.sites: "softwarerecs.stackexchange.com/questions" is not an API site name')
   })
 
+  it('rejects channel patterns with an unknown source', () => {
+    const c = raw()
+    c.export = { ...c.export, questionChannels: ['ask_hn'] }
+    expect(() => parseConfig(c)).toThrow('export.questionChannels[0]: "ask_hn" must be "source" or "source:channel"')
+  })
+
   it('names the missing section', () => {
     const c = raw()
     delete c.github

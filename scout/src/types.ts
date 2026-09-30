@@ -46,7 +46,16 @@ export interface ScoutConfig {
   /** Case-insensitive phrases that suggest someone is describing a problem. Used for ranking only. */
   painPhrases: string[]
   /** What the Analyst gets. This is what costs Claude usage, so it is capped hard. */
-  export: { days: number; limit: number; maxSharePerSource: number; maxTextLength: number }
+  export: {
+    days: number
+    limit: number
+    maxSharePerSource: number
+    maxTextLength: number
+    /** `source` or `source:channel` patterns; see rank.ts. */
+    questionChannels: string[]
+    questionBoost: number
+    dropWithoutPain: string[]
+  }
 }
 
 export interface FetchContext {

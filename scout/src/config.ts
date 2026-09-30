@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import type { FeedConfig, ScoutConfig } from './types.ts'
+import { SOURCE_NAMES, type FeedConfig, type ScoutConfig } from './types.ts'
 
 type Json = unknown
 
@@ -28,6 +28,17 @@ function str(value: Json, path: string): string {
 function strings(value: Json, path: string): string[] {
   if (!Array.isArray(value)) throw new ConfigError(`${path} must be an array of strings`)
   return value.map((v, i) => str(v, `${path}[${i}]`))
+}
+
+/** `source` or `source:channel`, where source is a real source name. */
+function channelPatterns(value: Json, path: string): string[] {
+  return strings(value, path).map((pattern, i) => {
+    const [source, channel, extra] = pattern.split(':')
+    if (!(SOURCE_NAMES as readonly string[]).includes(source ?? '') || channel === '' || extra !== undefined) {
+      throw new ConfigError(`${path}[${i}]: "${pattern}" must be "source" or "source:channel" (sources: ${SOURCE_NAMES.join(', ')})`)
+    }
+    return pattern
+  })
 }
 
 function feeds(value: Json, path: string): FeedConfig[] {
@@ -106,6 +117,9 @@ export function parseConfig(raw: Json): ScoutConfig {
       limit: num(exp.limit, 'export.limit', 1),
       maxSharePerSource: maxShare,
       maxTextLength: num(exp.maxTextLength, 'export.maxTextLength', 50),
+      questionChannels: channelPatterns(exp.questionChannels, 'export.questionChannels'),
+      questionBoost: num(exp.questionBoost, 'export.questionBoost'),
+      dropWithoutPain: channelPatterns(exp.dropWithoutPain, 'export.dropWithoutPain'),
     },
   }
 }

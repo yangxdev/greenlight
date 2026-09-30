@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { loadConfig } from './config.ts'
-import { rankSignals } from './rank.ts'
+import { isDroppedNoise, rankSignals } from './rank.ts'
 import { SOURCES } from './sources/index.ts'
 import { dedupeById, openMongoStore, readJsonl, writeJsonl, type Store } from './store.ts'
 import { SOURCE_NAMES, type FetchContext, type Signal, type SourceName } from './types.ts'
@@ -146,17 +146,23 @@ async function exportCommand(args: string[], deps: Deps): Promise<number> {
     }
   }
 
-  const ranked = rankSignals(signals, {
+  const rankOptions = {
     limit,
     maxSharePerSource: config.export.maxSharePerSource,
     maxTextLength: config.export.maxTextLength,
     painPhrases: config.painPhrases,
-  })
+    questionChannels: config.export.questionChannels,
+    questionBoost: config.export.questionBoost,
+    dropWithoutPain: config.export.dropWithoutPain,
+  }
+  const ranked = rankSignals(signals, rankOptions)
+  const noise = signals.filter((s) => isDroppedNoise(s, rankOptions)).length
   await writeJsonl(values.out, ranked)
 
   const bySource = SOURCE_NAMES.map((name) => `${name} ${ranked.filter((s) => s.source === name).length}`).join(', ')
   const approxTokens = Math.round(ranked.reduce((n, s) => n + JSON.stringify(s).length, 0) / 4)
-  const summary = `exported ${ranked.length} of ${signals.length} signals from the last ${days} days (${bySource}), about ${approxTokens} tokens, to ${values.out}`
+  const skipped = noise > 0 ? `; ${noise} skipped as ${config.export.dropWithoutPain.join('/')} without a pain phrase` : ''
+  const summary = `exported ${ranked.length} of ${signals.length} signals from the last ${days} days (${bySource}${skipped}), about ${approxTokens} tokens, to ${values.out}`
   deps.log(summary)
   await stepSummary(deps, `### Scout export\n\n${summary}\n`)
   return 0
