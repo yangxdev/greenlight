@@ -11,7 +11,7 @@
     "hitsPerPage": 100
   },
   "reddit": {
-    "_comment": "Pain-heavy communities by default. Swap in the ones where your compass.md users hang out.",
+    "_comment": "Must match the subreddits declared in the Reddit API access request (see README). Ask Reddit before adding more.",
     "enabled": false,
     "subreddits": [
       "SomebodyMakeThis",
