@@ -12,7 +12,7 @@
   },
   "reddit": {
     "_comment": "Pain-heavy communities by default. Swap in the ones where your compass.md users hang out.",
-    "enabled": true,
+    "enabled": false,
     "subreddits": [
       "SomebodyMakeThis",
       "AppIdeas",
