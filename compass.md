@@ -24,6 +24,26 @@ The agents treat every line here as a hard constraint unless it says "prefer".
 - Hosting/CI: Cloudflare Pages, GitHub Actions.
 - Tests: Vitest + Testing Library. Lint: ESLint.
 
+## Look & feel
+
+Every product looks like a sibling of my own apps, yangxdev.com and waypoint: warm neutrals, hairline separation,
+light first (dark available and remembered), one vermilion accent (朱色) used sparingly, Geist type. The product
+template already implements this (tokens in `src/index.css`, primitives in `src/components/ui`, rules in `CLAUDE.md`),
+so blueprints should build with it, not restyle it.
+
+- **Tools over pages.** Most products are tools people *use*, so follow waypoint: dense, calm, softly rounded cards.
+  Only a single landing page may follow yangxdev.com: square corners, flat hairlines, a large tight headline.
+- **Restraint is the brand.** No gradients, glassmorphism, emoji, stock illustrations, serif or decorative fonts.
+  Distinction comes from type scale, spacing and one accent.
+- **One primary action per screen.** If a screen needs two, it's two screens or the scope is wrong.
+- **Scope for the design, too:** at most 3 screens, each with a real empty state and a loading state. Every screen
+  must work at 320px wide and in both themes.
+- **Voice:** plain and specific, sentence case, no exclamation marks, no superlatives. The headline says what the tool
+  does in one line.
+- **Colour means something.** The accent marks what's notable; status colours only mean status. Category colours
+  only when people scan by type (like flights vs hotels in waypoint).
+- **Don't copy yangxdev.com's personal branding** (Japanese layer, hanko seal, vertical rail labels) into products.
+
 ## Budget (hard limits)
 
 - €0 beyond the Claude Pro plan. Free tiers only: GitHub, Cloudflare (Pages/Workers/R2/D1), MongoDB Atlas M0.
