@@ -109,7 +109,7 @@ snapshot.
    It never adds `approved`, and bot-filed issues trigger nothing.
 1. **You** review the `idea` issues, or write your own with the *Idea* form, and add `approved` to the ones you want.
 2. **Architect** (`architect.yml`, about 20 turns max), in three jobs:
-   - `scaffold` (no AI) creates `<you>/<slugified-title>` (private by default) from `template/`, replacing the
+   - `scaffold` (no AI) creates `<you>/<slugified-title>` (public by default) from `template/`, replacing the
      `greenlight-product` placeholder with the repo name. It copies `CLAUDE_CODE_OAUTH_TOKEN`, `GREENLIGHT_TOKEN` and,
      if present, the Cloudflare secrets into the product repo, and sets the variables `GREENLIGHT_REPO`/`GREENLIGHT_ISSUE`;
    - `blueprint` (AI): Claude reads `compass.md`, the issue (plus your comments) and `templates/blueprint.md`, and
@@ -171,8 +171,10 @@ The Pro plan's usage limits are the real budget:
 - **The AI review only runs when deterministic checks pass.** A red check goes back to the Factory with the log, without
   spending a review.
 - **No AI in deterministic steps.** Repo creation, secrets, validation, checks, pushes, PRs and labels are all shell.
-- **GitHub Actions minutes:** private repos get 2,000 free minutes a month and public repos are unlimited. A Factory run
-  can take up to 90 minutes. If minutes get tight, set `PRODUCT_VISIBILITY=public` (secrets stay secret either way).
+- **GitHub Actions minutes:** public repos are unlimited; private repos share 2,000 free minutes a month, and a Factory
+  run can take up to 90. That is why product repos are public by default (`PRODUCT_VISIBILITY`); secrets stay secret
+  either way, and `greenlight` itself stays private. Pull requests from forks only get the deterministic checks: the
+  Inspector's AI review, merge and fix loop run for the repo's own `factory/*` branches only.
 
 ### Security model
 
@@ -256,7 +258,7 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 `MONGODB_URI`. The Scout creates its indexes itself, including a 30-day TTL, so the collection stays well under M0's
 512 MB.
 
-Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`private`|`public`, default `private`),
+Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`public`|`private`, default `public`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
 `INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
 `CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), and `CLAUDE_MODEL` (passed as `--model`;

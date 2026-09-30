@@ -91,7 +91,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           FULL: ${{ steps.repo.outputs.full }}
           NAME: ${{ steps.repo.outputs.name }}
-          VISIBILITY: ${{ vars.PRODUCT_VISIBILITY || 'private' }}
+          VISIBILITY: ${{ vars.PRODUCT_VISIBILITY || 'public' }}
         run: |
           gh repo create "$FULL" "--$VISIBILITY" --description "Greenlight product (from $GITHUB_REPOSITORY#$ISSUE)"
           scaffold="$RUNNER_TEMP/scaffold"
