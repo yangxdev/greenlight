@@ -1,0 +1,69 @@
+{
+  "items": [
+    {
+      "tags": ["web-apps", "invoicing"],
+      "owner": { "account_id": 1001, "reputation": 23, "user_id": 2001, "user_type": "registered", "display_name": "someone" },
+      "is_answered": true,
+      "view_count": 88,
+      "answer_count": 1,
+      "score": 3,
+      "last_activity_date": 1790660000,
+      "creation_date": 1790650000,
+      "question_id": 91001,
+      "content_license": "CC BY-SA 4.0",
+      "link": "https://softwarerecs.stackexchange.com/questions/91001/tool-to-track-freelance-invoices-and-send-polite-reminders",
+      "title": "Tool to track freelance invoices &amp; send polite reminders",
+      "body": "<p>I&#39;m a freelancer with about 20 clients. I track invoices in a spreadsheet and chase late payments <em>manually</em>.</p>\n<p>Is there a web app that does this for free?</p>"
+    },
+    {
+      "tags": ["windows"],
+      "owner": { "account_id": 1002, "reputation": 1, "user_id": 2002, "user_type": "registered", "display_name": "other" },
+      "is_answered": false,
+      "view_count": 12,
+      "closed_date": 1790655000,
+      "answer_count": 0,
+      "score": 1,
+      "last_activity_date": 1790655000,
+      "creation_date": 1790640000,
+      "question_id": 91002,
+      "content_license": "CC BY-SA 4.0",
+      "link": "https://softwarerecs.stackexchange.com/questions/91002/best-software",
+      "closed_reason": "Needs details or clarity",
+      "title": "Best software?",
+      "body": "<p>What is the best software?</p>"
+    },
+    {
+      "tags": ["android"],
+      "owner": { "account_id": 1003, "reputation": 5, "user_id": 2003, "user_type": "registered", "display_name": "third" },
+      "is_answered": false,
+      "view_count": 30,
+      "answer_count": 0,
+      "score": -2,
+      "last_activity_date": 1790630000,
+      "creation_date": 1790630000,
+      "question_id": 91003,
+      "content_license": "CC BY-SA 4.0",
+      "link": "https://softwarerecs.stackexchange.com/questions/91003/free-vpn",
+      "title": "Free VPN that works everywhere",
+      "body": "<p>Need a free VPN.</p>"
+    },
+    {
+      "tags": ["web-apps", "calendar", "scheduling"],
+      "owner": { "account_id": 1004, "reputation": 101, "user_id": 2004, "user_type": "registered", "display_name": "fourth" },
+      "is_answered": false,
+      "view_count": 40,
+      "answer_count": 0,
+      "score": 0,
+      "last_activity_date": 1790620000,
+      "creation_date": 1790620000,
+      "question_id": 91004,
+      "content_license": "CC BY-SA 4.0",
+      "link": "https://softwarerecs.stackexchange.com/questions/91004/shared-rota-for-a-volunteer-group",
+      "title": "Shared rota for a volunteer group without everyone creating accounts",
+      "body": "<p>We run a food bank with 30 volunteers. Today the rota is a WhatsApp message I rewrite every week.</p>"
+    }
+  ],
+  "has_more": false,
+  "quota_max": 300,
+  "quota_remaining": 287
+}

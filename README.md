@@ -76,7 +76,7 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
 analysis/                   weekly idea cards and Critic verdicts, committed by ideas.yml
 observer/                   Observer data scripts: uptime probes, Web Analytics, weekly metrics.json (see observer/README.md)
 reports/                    weekly reports (<week>.md) and verdicts (<week>.json), committed by observer.yml
-scout/                      Scout: HN, Reddit, GitHub, Product Hunt, RSS fetchers + ranked export (see scout/README.md)
+scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Exchange, RSS fetchers + ranked export (see scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
   CLAUDE.md                 stack conventions, Look & feel (house style), R2/Mongo usage, testing rules, definition of done
@@ -242,6 +242,7 @@ Scout secrets (all optional; the Scout runs without them):
 | `MONGODB_URI` | Atlas connection string (see below) | signals go to a JSONL artifact on each run instead of MongoDB |
 | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | a **script** app at reddit.com/prefs/apps, which now needs Reddit's approval first ([how](scout/README.md#reddit-access)) | Reddit is skipped; the other sources still run |
 | `PRODUCTHUNT_TOKEN` | producthunt.com/v2/oauth/applications → developer token | public feed only, with no vote or comment counts |
+| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs 2 |
 
 **MongoDB Atlas (free M0):** create an M0 cluster, add a database user limited to read/write on the `greenlight` database,
 and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Copy the `mongodb+srv://…` string into

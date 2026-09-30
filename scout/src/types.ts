@@ -1,13 +1,13 @@
-export type SourceName = 'hn' | 'reddit' | 'github' | 'producthunt' | 'rss'
+export type SourceName = 'hn' | 'reddit' | 'github' | 'producthunt' | 'stackexchange' | 'rss'
 
-export const SOURCE_NAMES: readonly SourceName[] = ['hn', 'reddit', 'github', 'producthunt', 'rss']
+export const SOURCE_NAMES: readonly SourceName[] = ['hn', 'reddit', 'github', 'producthunt', 'stackexchange', 'rss']
 
 /** One normalised item from any source. This is the Analyst's input record (plus rank fields on export). */
 export interface Signal {
   /** Stable id `<source>:<native id>`, used as the MongoDB `_id`. */
   id: string
   source: SourceName
-  /** Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`), repo language. */
+  /** Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`), repo language, Stack Exchange site. */
   channel: string
   /** Where the discussion lives: HN item, Reddit thread, repo page, Product Hunt post, feed item. */
   url: string
@@ -40,6 +40,8 @@ export interface ScoutConfig {
   reddit: { enabled: boolean; subreddits: string[]; limit: number; minScore: number }
   github: { enabled: boolean; minStars: number; createdWithinDays: number; perPage: number }
   producthunt: { enabled: boolean; limit: number }
+  /** `sites` are API site names, e.g. `softwarerecs` for softwarerecs.stackexchange.com. */
+  stackexchange: { enabled: boolean; sites: string[]; minScore: number; pageSize: number }
   rss: { enabled: boolean; feeds: FeedConfig[] }
   /** Case-insensitive phrases that suggest someone is describing a problem. Used for ranking only. */
   painPhrases: string[]

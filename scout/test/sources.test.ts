@@ -4,6 +4,7 @@ import { hn } from '../src/sources/hn.ts'
 import { producthunt } from '../src/sources/producthunt.ts'
 import { reddit } from '../src/sources/reddit.ts'
 import { rss } from '../src/sources/rss.ts'
+import { stackexchange } from '../src/sources/stackexchange.ts'
 import {
   configWith,
   fakeFetch,
@@ -176,6 +177,81 @@ describe('producthunt', () => {
       createdAt: '2026-09-29T07:01:00.000Z',
     })
     expect(signals[0]?.text).toBe('Let hourly staff swap shifts without a group chat\nDiscussion\n|\nLink')
+  })
+})
+
+describe('stackexchange', () => {
+  const oneSite = configWith((c) => {
+    c.stackexchange.sites = ['softwarerecs']
+  })
+
+  it('keeps open questions at or above minScore, with site-scoped ids', async () => {
+    const signals = await stackexchange.fetch(makeCtx(fakeFetch(fixtureRoutes), { config: oneSite }))
+
+    expect(signals.map((s) => s.id)).toEqual(['stackexchange:softwarerecs:91001', 'stackexchange:softwarerecs:91004'])
+    const link = 'https://softwarerecs.stackexchange.com/questions/91001/tool-to-track-freelance-invoices-and-send-polite-reminders'
+    expect(signals[0]).toEqual({
+      id: 'stackexchange:softwarerecs:91001',
+      source: 'stackexchange',
+      channel: 'softwarerecs',
+      url: link,
+      link,
+      title: 'Tool to track freelance invoices & send polite reminders',
+      text:
+        "I'm a freelancer with about 20 clients. I track invoices in a spreadsheet and chase late payments manually.\n" +
+        'Is there a web app that does this for free?\nTags: web-apps, invoicing',
+      score: 3,
+      comments: 1,
+      createdAt: '2026-09-29T02:46:40.000Z',
+    })
+  })
+
+  it('asks for new questions in the lookback window, with the key when set', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    await stackexchange.fetch(makeCtx(f, { config: oneSite }))
+    const params = new URL(f.calls[0]?.url ?? '').searchParams
+    expect(Object.fromEntries(params)).toEqual({
+      site: 'softwarerecs',
+      fromdate: String(CUTOFF_EPOCH),
+      sort: 'creation',
+      order: 'desc',
+      pagesize: '100',
+      filter: 'withbody',
+    })
+
+    const keyed = fakeFetch(fixtureRoutes)
+    await stackexchange.fetch(makeCtx(keyed, { config: oneSite, env: { STACKEXCHANGE_KEY: 'k3y' } }))
+    expect(new URL(keyed.calls[0]?.url ?? '').searchParams.get('key')).toBe('k3y')
+  })
+
+  it('cuts the body, not the tags, when the text is too long', async () => {
+    const short = configWith((c) => {
+      c.stackexchange.sites = ['softwarerecs']
+      c.maxTextLength = 100
+    })
+    const [first] = await stackexchange.fetch(makeCtx(fakeFetch(fixtureRoutes), { config: short }))
+    expect(first?.text).toHaveLength(100)
+    expect(first?.text).toMatch(/…\nTags: web-apps, invoicing$/)
+  })
+
+  it('waits out backoff, skips a failing site and fails when all of them fail', async () => {
+    const two = configWith((c) => {
+      c.stackexchange.sites = ['softwarerecs', 'webapps']
+    })
+    const throttled = json({ error_id: 502, error_message: 'too many requests from this IP', error_name: 'throttle_violation' }, 400)
+    const withBackoff = { ...JSON.parse(fixture('stackexchange-softwarerecs.json')), backoff: 5, quota_remaining: 12 }
+    const f = fakeFetch((url) => (url.searchParams.get('site') === 'webapps' ? throttled : json(withBackoff)))
+    const ctx = makeCtx(f, { config: two })
+    const sleeps: number[] = []
+    ctx.sleep = async (ms) => void sleeps.push(ms)
+
+    expect(await stackexchange.fetch(ctx)).toHaveLength(2)
+    expect(sleeps).toEqual([5000])
+    expect(ctx.logs.some((l) => l.includes('skipped webapps: HTTP 400') && l.includes('throttle_violation'))).toBe(true)
+    expect(ctx.logs.some((l) => l.includes('only 12 requests left today'))).toBe(true)
+
+    const down = fakeFetch(() => new Response('unavailable', { status: 400 }))
+    await expect(stackexchange.fetch(makeCtx(down, { config: two }))).rejects.toThrow('all sites failed')
   })
 })
 

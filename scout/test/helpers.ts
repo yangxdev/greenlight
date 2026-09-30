@@ -60,6 +60,7 @@ export function fixtureRoutes(url: URL): Response | undefined {
   }
   if (url.hostname === 'oauth.reddit.com' && url.pathname.endsWith('/top')) return json(fixture('reddit-smallbusiness.json'))
   if (url.hostname === 'api.github.com') return json(fixture('github-search.json'))
+  if (url.hostname === 'api.stackexchange.com') return json(fixture('stackexchange-softwarerecs.json'))
   if (url.hostname === 'www.producthunt.com' && url.pathname === '/feed') return xml(fixture('producthunt-feed.xml'))
   if (url.hostname === 'lobste.rs') return xml(fixture('rss-lobsters.xml'))
   return undefined

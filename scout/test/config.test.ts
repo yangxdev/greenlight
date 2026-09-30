@@ -25,6 +25,12 @@ describe('config', () => {
     expect(() => parseConfig(c)).toThrow('export.maxSharePerSource must be between 0 and 1')
   })
 
+  it('rejects Stack Exchange sites given as hostnames', () => {
+    const c = raw()
+    c.stackexchange = { ...c.stackexchange, sites: ['softwarerecs.stackexchange.com/questions'] }
+    expect(() => parseConfig(c)).toThrow('stackexchange.sites: "softwarerecs.stackexchange.com/questions" is not an API site name')
+  })
+
   it('names the missing section', () => {
     const c = raw()
     delete c.github

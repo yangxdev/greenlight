@@ -47,6 +47,7 @@ export function parseConfig(raw: Json): ScoutConfig {
   const reddit = obj(c.reddit, 'reddit')
   const github = obj(c.github, 'github')
   const producthunt = obj(c.producthunt, 'producthunt')
+  const stackexchange = obj(c.stackexchange, 'stackexchange')
   const rss = obj(c.rss, 'rss')
   const exp = obj(c.export, 'export')
 
@@ -54,6 +55,14 @@ export function parseConfig(raw: Json): ScoutConfig {
   for (const sub of subreddits) {
     if (!/^[A-Za-z0-9_]{2,21}$/.test(sub)) throw new ConfigError(`reddit.subreddits: "${sub}" is not a subreddit name (no "r/" prefix)`)
   }
+  const sites = strings(stackexchange.sites, 'stackexchange.sites')
+  for (const site of sites) {
+    if (!/^[a-z0-9]+(\.[a-z0-9]+)*$/.test(site)) {
+      throw new ConfigError(`stackexchange.sites: "${site}" is not an API site name (softwarerecs, not softwarerecs.stackexchange.com)`)
+    }
+  }
+  const pageSize = num(stackexchange.pageSize, 'stackexchange.pageSize', 1)
+  if (pageSize > 100) throw new ConfigError('stackexchange.pageSize must be at most 100')
   const maxShare = num(exp.maxSharePerSource, 'export.maxSharePerSource')
   if (maxShare > 1) throw new ConfigError('export.maxSharePerSource must be between 0 and 1')
 
@@ -83,6 +92,12 @@ export function parseConfig(raw: Json): ScoutConfig {
     producthunt: {
       enabled: bool(producthunt.enabled, 'producthunt.enabled'),
       limit: num(producthunt.limit, 'producthunt.limit', 1),
+    },
+    stackexchange: {
+      enabled: bool(stackexchange.enabled, 'stackexchange.enabled'),
+      sites,
+      minScore: num(stackexchange.minScore, 'stackexchange.minScore'),
+      pageSize,
     },
     rss: { enabled: bool(rss.enabled, 'rss.enabled'), feeds: feeds(rss.feeds, 'rss.feeds') },
     painPhrases: strings(c.painPhrases, 'painPhrases').map((p) => p.toLowerCase()),

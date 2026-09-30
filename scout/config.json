@@ -38,6 +38,13 @@
     "enabled": true,
     "limit": 30
   },
+  "stackexchange": {
+    "_comment": "API site names (softwarerecs = softwarerecs.stackexchange.com). Both sites are mostly people asking whether a tool exists.",
+    "enabled": true,
+    "sites": ["softwarerecs", "webapps"],
+    "minScore": 0,
+    "pageSize": 100
+  },
   "rss": {
     "_comment": "Any RSS 2.0 / RSS 1.0 / Atom feed.",
     "enabled": true,

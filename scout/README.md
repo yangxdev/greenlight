@@ -22,6 +22,7 @@ Node 22.18+ runs the TypeScript directly, so there is no build step.
 | `reddit` | `oauth.reddit.com/r/<sub>/top?t=day` for each subreddit in `config.json` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (app-only OAuth), which need Reddit's approval (see below) | Skipped, not failed, without credentials. One failing subreddit is skipped |
 | `github` | Search API: repos created in the last `createdWithinDays` with ≥ `minStars` | `GITHUB_TOKEN` (the workflow's own) | Stands in for "trending", which has no API |
 | `producthunt` | GraphQL API (votes, comments) | `PRODUCTHUNT_TOKEN` (developer token) | Falls back to the public Atom feed (no engagement numbers) |
+| `stackexchange` | API `/questions` (newest, with body) for each site in `config.json`: `softwarerecs`, `webapps` | none; optional `STACKEXCHANGE_KEY` | Questions are people asking whether a tool exists. Closed and downvoted questions are dropped; `comments` counts answers. Without a key the quota is 300 requests a day per IP, shared with everyone on the same GitHub runner IP. One failing site is skipped |
 | `rss` | Any RSS 2.0 / RSS 1.0 / Atom feed in `config.json` | none | One failing feed is skipped |
 
 A source that fails is logged as a warning and the run continues. The run only fails when every source fails.
