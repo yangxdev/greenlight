@@ -204,7 +204,7 @@ jobs:
             Write analysis/${{ needs.export.outputs.date }}-critic.md, then return the structured result.
             Do not create or modify any other file.
           claude_args: >-
-            --max-turns ${{ vars.CRITIC_MAX_TURNS || '15' }}
+            --max-turns ${{ vars.CRITIC_MAX_TURNS || '25' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
             --json-schema '{"type":"object","additionalProperties":false,"required":["summary","ideas"],"properties":{"summary":{"type":"string"},"ideas":{"type":"array","maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["name","scores","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"scores":{"type":"object","additionalProperties":false,"required":["pain","competition","mvp","reach"],"properties":{"pain":{"type":"integer","minimum":0,"maximum":5},"competition":{"type":"integer","minimum":0,"maximum":5},"mvp":{"type":"integer","minimum":0,"maximum":5},"reach":{"type":"integer","minimum":0,"maximum":5}}},"body":{"type":"string","minLength":50}}}}}}'
@@ -251,6 +251,12 @@ jobs:
         run: |
           git config user.name "greenlight-analyst"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # A same-day re-run must not leave an earlier review next to cards it never saw.
+          if [ "$CRITIC_RESULT" != "success" ]; then
+            run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            printf '# Critic review %s\n\nThe Critic did not finish (%s), so these cards were not scored and nothing was filed.\nRun: %s\n' \
+              "$DATE" "$CRITIC_RESULT" "$run_url" > "analysis/$DATE-critic.md"
+          fi
           git add analysis/
           if git diff --cached --quiet; then echo "Nothing new to commit"; exit 0; fi
           git commit -m "analysis: $DATE"
