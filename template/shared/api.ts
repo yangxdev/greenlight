@@ -3,8 +3,8 @@
  * Keep this file free of runtime code and platform types so both sides can import it.
  */
 export interface HealthResponse {
-  ok: true
-  time: string
-  storage: boolean
-  database: boolean
+  ok: true;
+  time: string;
+  storage: boolean;
+  database: boolean;
 }

@@ -1,0 +1,8 @@
+dist
+coverage
+node_modules
+.wrangler
+package-lock.json
+# Prose and CI files: written by people and agents, and .github/ is off-limits to the Factory anyway.
+*.md
+.github/

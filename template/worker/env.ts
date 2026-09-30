@@ -4,10 +4,10 @@
  */
 export interface Env {
   /** The built SPA (wrangler.jsonc "assets.binding"). */
-  ASSETS: Fetcher
+  ASSETS: Fetcher;
   /** R2 bucket, binding "BUCKET" in wrangler.jsonc (optional until the blueprint needs it). */
-  BUCKET?: R2Bucket
+  BUCKET?: R2Bucket;
   /** MongoDB Atlas connection string, set with `npx wrangler secret put MONGODB_URI`. */
-  MONGODB_URI?: string
-  MONGODB_DB?: string
+  MONGODB_URI?: string;
+  MONGODB_DB?: string;
 }

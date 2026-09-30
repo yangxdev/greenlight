@@ -79,7 +79,9 @@ reports/                    weekly reports (<week>.md) and verdicts (<week>.json
 scout/                      Scout: HN, Reddit, GitHub, Product Hunt, RSS fetchers + ranked export (see scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
-  CLAUDE.md                 stack conventions, R2/Mongo usage, testing rules, definition of done
+  CLAUDE.md                 stack conventions, Look & feel (house style), R2/Mongo usage, testing rules, definition of done
+  src/index.css             house-style tokens (yangxdev.com / waypoint family): colours, type, radius, shadows, motion
+  src/components/ui/        Button, IconButton, Field, EmptyState, Skeleton, DetailList, ThemeToggle + class strings
   src/ worker/ shared/      Vite + React + RTK + Tailwind + TS app, the /api Worker, shared types
   wrangler.jsonc            Cloudflare Worker with static assets (same shape as waypoint / yangxdev.com)
   .github/workflows/

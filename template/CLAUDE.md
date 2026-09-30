@@ -10,16 +10,18 @@ If you are the Factory, the blueprint decides *what* to build and this file deci
 | Language     | TypeScript, `strict` + `noUncheckedIndexedAccess`                        |
 | UI           | React 19 + Vite                                                          |
 | State        | Redux Toolkit (`createSlice`, `createAsyncThunk`, RTK Query if useful)   |
-| Styling      | Tailwind CSS v4 via `@tailwindcss/vite` (utility classes, no CSS files per component) |
+| Styling      | Tailwind CSS v4 via `@tailwindcss/vite`, with the house-style tokens in `src/index.css` (see Look & feel) |
+| Fonts, icons | Geist + Geist Mono (`@fontsource-variable`), Lucide icons via `react-icons/lu` |
 | Server code  | A Cloudflare Worker in `worker/`, serving `/api/*` on the same origin as the app |
 | Files        | Cloudflare R2 via the `BUCKET` binding                                   |
 | Database     | MongoDB Atlas free tier (M0) via the official `mongodb` driver. D1 is the fallback, see below |
 | Tests        | Vitest + Testing Library + jsdom                                         |
-| Lint         | ESLint flat config (`typescript-eslint`, `react-hooks`, `react-refresh`) |
+| Lint, format | ESLint flat config (`typescript-eslint`, `react-hooks`, `react-refresh`) + Prettier (`npm run format`) |
 | Hosting      | Cloudflare Workers with static assets (`wrangler.jsonc`: `dist/` + `worker/`), on `*.workers.dev` |
 
-Don't add a router, UI kit, CSS-in-JS, ORM or state library unless `blueprint.md` names it.
-If you need routing, `react-router` is the approved choice. Fewer dependencies is better.
+Don't add a UI kit, CSS-in-JS, icon set, font, ORM or state library. Approved when the blueprint needs them:
+`react-router` (more than one screen), RTK Query (`createApi`, for server data with caching), `zod` (validating API
+input), `i18next` + `react-i18next` (more than one language). Fewer dependencies is better.
 
 ## Folder structure
 
@@ -31,8 +33,10 @@ src/
   app/store.ts        # makeStore(), RootState, AppDispatch (register slices in combineSlices)
   app/hooks.ts        # useAppDispatch / useAppSelector (always use these)
   features/<name>/    # one folder per feature: <name>Slice.ts, components, <name>.test.ts(x)
-  components/         # shared presentational components (no Redux inside)
-  lib/                # framework-free helpers (api.ts fetch wrapper, formatting, ...)
+  components/ui/      # house-style primitives: Button, IconButton, Field, EmptyState, Skeleton, DetailList,
+                      #   ThemeToggle, and styles.ts (buttonClass, cardClass, inputClass, labelClass, monoClass)
+  components/         # other shared presentational components (no Redux inside)
+  lib/                # framework-free helpers: api.ts fetch wrapper, theme.ts, cn.ts, formatting, ...
   test/               # setup.ts + renderWithStore helper
 shared/api.ts         # request/response types shared by src/ and worker/ (types only)
 worker/
@@ -53,10 +57,60 @@ build-report.md       # written by the Factory at the end of a build
 - Use `import type` for type-only imports.
 - Components: function components, props typed inline or with an `interface` next to them. No `any`.
 - State: server data goes through thunks or RTK Query. Components never call `fetch` directly; use `src/lib/api.ts`.
-- Styling: Tailwind utilities in `className`. Put design tokens in `@theme` in `index.css`. It must be mobile-first and have readable contrast.
+- Styling: Tailwind utilities in `className`, built from the tokens and `components/ui`. Follow **Look & feel** below.
 - Accessibility: semantic elements, labelled inputs, `role="status"`/`alert` for async feedback. Tests query by role/label.
 - Never commit secrets. Server secrets live in Cloudflare (`npx wrangler secret put`) and locally in `.dev.vars` (gitignored).
   Nothing secret goes into `import.meta.env` because Vite inlines `VITE_*` values into the public bundle.
+
+## Look & feel
+
+Products look like siblings of the owner's own apps (yangxdev.com and waypoint): warm neutrals, hairlines, light first,
+one vermilion accent. The tokens in `src/index.css` and the primitives in `src/components/ui/` already encode this;
+build with them rather than around them.
+
+**Principles**
+
+- **Light is the default** (even on a dark system); dark is one click away (`ThemeToggle`, remembered) and must look
+  as good. Check every screen in both themes.
+- **One accent, 朱色 (`brand`), rationed**: the primary button, the focus ring, the selected state, the one notable
+  thing in a view. Never decoration, never a second accent. `danger` / `warning` / `success` are for status only.
+- **Separation by hairlines (`border-line`) and tone steps (`canvas` → `zone` → `surface` → `sunken`)**, not heavy
+  boxes. Cards use `cardClass`: a hairline and a barely visible lift.
+- **Geist for everything; Geist Mono (`monoClass`) only for what people transcribe**: codes, IDs, money, times.
+  No serif, no decorative fonts, no gradients, no glassmorphism, no emoji in the UI, no stock illustrations.
+- **Distinction comes from scale and tightness**: `text-display` titles, `font-semibold`, generous whitespace.
+- **Never hardcode a colour, shadow or duration.** Use tokens: `bg-surface`, `text-muted`, `border-line`,
+  `shadow-(--shadow-card)` (always this form; plain `shadow-card` freezes the light value), `duration-(--duration-hover)`,
+  `ease-out-soft`. If a colour sits ON another colour, it needs its own token (like `on-brand`); add it to `index.css` in
+  all three theme blocks.
+- **Motion**: only the three durations (120ms hover, 220ms panels, 320ms reveals) and the one curve. No bounce.
+  Everything collapses under `prefers-reduced-motion` (already global).
+
+**Components and interaction**
+
+- **One `primary` Button per view**; everything else `ghost`. Destructive actions use `danger` and confirm first.
+  Anything that navigates is an `<a>` styled with `buttonClass()`, never a button with an onClick.
+- Icon-only controls use `IconButton` with a `label`. Icons come from `react-icons/lu` (Lucide), `aria-hidden` when
+  decorative, `size-4` inline.
+- Touch targets: 36px under a mouse, 44px under a finger, via `pointer-coarse:` (already in the primitives). Never
+  make that decision with a width breakpoint.
+- Forms: `Field` (label above, hint below, error as `role="alert"`). Captions and labels use `labelClass` (small
+  uppercase sans).
+- Details: `DetailList` for label/value rows with hairlines between them.
+- Empty states: `EmptyState` (subtle icon, one-line title, one-line body, one action). Loading: `Skeleton` shaped like
+  the content, not spinners.
+- Status dots are the only fully round element (`rounded-full`); everything else uses `rounded-md` (cards, inputs,
+  buttons) or `rounded-sm` (chips, badges).
+- Category colours are allowed only when scanning by type is a real task (like waypoint's flights vs hotels): one
+  family with the same lightness and chroma, evenly spaced hues, each ≥ 4.5:1 on `canvas`, never the danger hue.
+  Define them as tokens in `index.css`.
+- Mobile first: no horizontal scroll at 320px. Tabular numbers (`<time>` or `.tnum`) for anything that lines up.
+- **Single landing pages** may go further in yangxdev.com's direction: square corners, flat hairlines with no card
+  shadows, a hero up to 72px / 0.98 line-height / −0.035em (40px on mobile), two-digit section indices (`01`, `02`) in
+  small uppercase mono.
+
+**Voice**: plain and specific. Sentence case, no exclamation marks, no marketing superlatives. Say what the thing does in
+one line.
 
 ## Server code: the Worker
 
@@ -155,9 +209,10 @@ binding (`d1_databases` in `wrangler.jsonc`), with plain SQL migrations in `migr
 
 A task is done when all of these hold:
 
-1. `npm run check` passes: `eslint --max-warnings 0`, `vitest run`, `tsc -b && vite build`.
+1. `npm run check` passes: ESLint (`--max-warnings 0`) + Prettier check, `vitest run`, `tsc -b && vite build`.
+   Run `npm run format` before committing.
 2. The task's acceptance criteria from `blueprint.md` are covered by tests.
-3. No `any`, no `// @ts-ignore`, no `eslint-disable` without a one-line reason.
+3. No `any`, no `// @ts-ignore`, no `eslint-disable` without a one-line reason. No hardcoded colours: tokens only.
 4. No new dependency that the blueprint or this file doesn't justify. `npm audit --audit-level=high` is clean.
 5. No secrets, tokens or connection strings in the diff.
 6. `GET /api/health` still returns `{ ok: true }` (the Publisher's smoke test depends on it).

@@ -1,7 +1,7 @@
-import tailwindcss from '@tailwindcss/vite'
-import react from '@vitejs/plugin-react'
-import type { Plugin } from 'vite'
-import { defineConfig } from 'vitest/config'
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 /**
  * Cloudflare Web Analytics (free, cookie-less). Workers don't auto-inject the beacon the way Pages did, so the
@@ -12,8 +12,9 @@ function webAnalytics(token = process.env.VITE_CF_BEACON_TOKEN): Plugin {
   return {
     name: 'greenlight:web-analytics',
     transformIndexHtml() {
-      if (!token) return []
-      if (!/^[a-f0-9]{32}$/i.test(token)) throw new Error('VITE_CF_BEACON_TOKEN must be the 32-character beacon token')
+      if (!token) return [];
+      if (!/^[a-f0-9]{32}$/i.test(token))
+        throw new Error('VITE_CF_BEACON_TOKEN must be the 32-character beacon token');
       return [
         {
           tag: 'script',
@@ -24,9 +25,9 @@ function webAnalytics(token = process.env.VITE_CF_BEACON_TOKEN): Plugin {
           },
           injectTo: 'body',
         },
-      ]
+      ];
     },
-  }
+  };
 }
 
 // https://vite.dev/config/
@@ -38,4 +39,4 @@ export default defineConfig({
     include: ['src/**/*.test.{ts,tsx}', 'worker/**/*.test.ts'],
     restoreMocks: true,
   },
-})
+});
