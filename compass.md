@@ -11,8 +11,7 @@ The agents treat every line here as a hard constraint unless it says "prefer".
 ## Interests (build things near these)
 
 <!-- TODO: 3–8 bullets. Domains you care about or have insider knowledge of. -->
-- …
-- …
+- Open for now: no preferred domain yet. Judge ideas on "What good means" alone.
 
 ## Stack (fixed)
 
@@ -72,7 +71,9 @@ so blueprints should build with it, not restyle it.
 - Scraping sites whose terms forbid it; storing other people's personal data.
 - Adult content, surveillance, dark patterns.
 - Products that only work at scale (marketplaces, social networks) or need a mobile app.
-- Business areas to avoid. <!-- TODO: name them -->
+- Advertising and marketing tech: ad networks, ad serving, programmatic buying, ad formats, location-based
+  marketing, coupons, campaign analytics.
+- Document AI: OCR, or extracting data from invoices, receipts, IDs or other documents.
 
 ## What "good" means
 
