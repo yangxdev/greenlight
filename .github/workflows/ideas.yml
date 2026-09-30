@@ -12,6 +12,13 @@ on:
   schedule:
     - cron: "13 6 * * 1" # Mondays 06:13 UTC, after that day's Scout run
   workflow_dispatch:
+    inputs:
+      days:
+        description: Analyse signals from the last N days (1-30). Empty means 7. Backfill the Scout first for older ones.
+        required: false
+      limit:
+        description: At most this many signals go to the Analyst (1-300). Empty means config.json's export.limit. More costs more usage.
+        required: false
 
 concurrency:
   group: ideas
@@ -55,16 +62,33 @@ jobs:
           PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
           STACKEXCHANGE_KEY: ${{ secrets.STACKEXCHANGE_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
+          DAYS: ${{ inputs.days }}
+          LIMIT: ${{ inputs.limit }}
         run: |
           out="$RUNNER_TEMP/ideas-input"
           mkdir -p "$out"
+          export_args=()
+          if [ -n "$DAYS" ]; then
+            if ! [[ "$DAYS" =~ ^[0-9]+$ ]] || [ "$DAYS" -lt 1 ] || [ "$DAYS" -gt 30 ]; then
+              echo "::error::days must be a whole number from 1 to 30"
+              exit 1
+            fi
+            export_args+=(--days "$DAYS")
+          fi
+          if [ -n "$LIMIT" ]; then
+            if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [ "$LIMIT" -lt 1 ] || [ "$LIMIT" -gt 300 ]; then
+              echo "::error::limit must be a whole number from 1 to 300"
+              exit 1
+            fi
+            export_args+=(--limit "$LIMIT")
+          fi
           if [ -n "$MONGODB_URI" ]; then
-            node src/cli.ts export --out "$out/signals.jsonl"
+            node src/cli.ts export "${export_args[@]}" --out "$out/signals.jsonl"
           else
-            echo "::notice::MONGODB_URI is not set, so this run uses today's signals instead of the last 7 days"
-            node src/cli.ts fetch --out "$RUNNER_TEMP/raw.jsonl" || true
+            echo "::notice::MONGODB_URI is not set, so this run fetches its own signals instead of reading the stored ones"
+            node src/cli.ts fetch ${DAYS:+--days "$DAYS"} --out "$RUNNER_TEMP/raw.jsonl" || true
             [ -f "$RUNNER_TEMP/raw.jsonl" ] || : > "$RUNNER_TEMP/raw.jsonl"
-            node src/cli.ts export --from "$RUNNER_TEMP/raw.jsonl" --out "$out/signals.jsonl"
+            node src/cli.ts export "${export_args[@]}" --from "$RUNNER_TEMP/raw.jsonl" --out "$out/signals.jsonl"
           fi
           count=$(wc -l < "$out/signals.jsonl" | tr -d ' ')
           {

@@ -11,6 +11,9 @@ on:
       sources:
         description: Comma-separated subset (hn,reddit,github,producthunt,stackexchange,rss). Empty means all enabled.
         required: false
+      days:
+        description: One-off backfill, look back this many days (1-30). Empty means the normal daily window.
+        required: false
 
 concurrency:
   group: scout
@@ -49,9 +52,17 @@ jobs:
           STACKEXCHANGE_KEY: ${{ secrets.STACKEXCHANGE_KEY }}
           GITHUB_TOKEN: ${{ github.token }}
           SOURCES: ${{ inputs.sources }}
+          DAYS: ${{ inputs.days }}
         run: |
           args=(fetch)
           if [ -n "$SOURCES" ]; then args+=(--sources "$SOURCES"); fi
+          if [ -n "$DAYS" ]; then
+            if ! [[ "$DAYS" =~ ^[0-9]+$ ]] || [ "$DAYS" -lt 1 ] || [ "$DAYS" -gt 30 ]; then
+              echo "::error::days must be a whole number from 1 to 30"
+              exit 1
+            fi
+            args+=(--days "$DAYS")
+          fi
           if [ -z "$MONGODB_URI" ]; then
             echo "::notice::MONGODB_URI is not set, so signals go to a JSONL artifact instead of MongoDB"
             args+=(--out "$RUNNER_TEMP/signals.jsonl")

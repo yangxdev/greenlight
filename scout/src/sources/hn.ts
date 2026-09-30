@@ -15,9 +15,12 @@ interface HnHit {
 
 interface HnResponse {
   hits: HnHit[]
+  nbPages?: number
 }
 
 const API = 'https://hn.algolia.com/api/v1/search_by_date'
+/** Algolia stops at 1,000 results per query, which is 10 pages of 100. A daily run needs one. */
+const MAX_PAGES = 10
 
 function channelOf(tags: string[]): string {
   if (tags.includes('ask_hn')) return 'ask_hn'
@@ -32,8 +35,14 @@ async function query(ctx: FetchContext, tags: string, minPoints: number): Promis
     numericFilters: `created_at_i>${since},points>=${minPoints}`,
     hitsPerPage: String(ctx.config.hn.hitsPerPage),
   })
-  const res = await getJson<HnResponse>(ctx, `${API}?${params}`)
-  return res.hits
+  const hits: HnHit[] = []
+  for (let page = 0; page < MAX_PAGES; page++) {
+    params.set('page', String(page))
+    const res = await getJson<HnResponse>(ctx, `${API}?${params}`)
+    hits.push(...res.hits)
+    if (page + 1 >= (res.nbPages ?? 1)) break
+  }
+  return hits
 }
 
 export const hn: Source = {

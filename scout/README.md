@@ -49,6 +49,14 @@ usernames. Post text lives in MongoDB for 30 days (TTL), and the idea cards in t
 Reddit data must never be used to train a model, which also means keeping model training off for the Claude account
 the agents run on.
 
+## Backfill (one-off, wider window)
+
+To look further back than a day: Actions → **Scout** → *Run workflow* with `days` (1–30), then Actions → **Ideas** →
+*Run workflow* with the same `days` (and optionally a higher `limit`, up to 300). Only HN and Stack Exchange really
+search back in time; Product Hunt still returns at most `producthunt.limit` launches, and Reddit, RSS and GitHub
+keep their usual windows. HN and Stack Exchange page
+through results (up to 1,000 per query) instead of stopping at the first page. Scheduled runs are unaffected.
+
 ## Data
 
 Each signal:

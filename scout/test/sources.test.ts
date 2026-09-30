@@ -32,6 +32,20 @@ describe('hn', () => {
     expect(asks?.get('numericFilters')).toBe(`created_at_i>${CUTOFF_EPOCH},points>=10`)
   })
 
+  it('pages through Algolia results when a long window has more than one page', async () => {
+    const stories = JSON.parse(fixture('hn-stories.json'))
+    const f = fakeFetch((url) => {
+      if (url.searchParams.get('tags') === 'ask_hn') return json({ hits: [], nbPages: 0 })
+      const page = Number(url.searchParams.get('page'))
+      return json({ hits: page === 0 ? stories.hits : [{ ...stories.hits[0], objectID: '45100099' }], nbPages: 2 })
+    })
+    const signals = await hn.fetch(makeCtx(f))
+
+    const storyPages = f.calls.filter((c) => new URL(c.url).searchParams.get('tags') === 'story')
+    expect(storyPages.map((c) => new URL(c.url).searchParams.get('page'))).toEqual(['0', '1'])
+    expect(signals.map((s) => s.id)).toContain('hn:45100099')
+  })
+
   it('normalises link posts and self posts', async () => {
     const signals = await hn.fetch(makeCtx(fakeFetch(fixtureRoutes)))
     expect(signals.find((s) => s.id === 'hn:45100001')).toEqual({
@@ -215,6 +229,7 @@ describe('stackexchange', () => {
       fromdate: String(CUTOFF_EPOCH),
       sort: 'creation',
       order: 'desc',
+      page: '1',
       pagesize: '100',
       filter: 'withbody',
     })
@@ -232,6 +247,16 @@ describe('stackexchange', () => {
     const [first] = await stackexchange.fetch(makeCtx(fakeFetch(fixtureRoutes), { config: short }))
     expect(first?.text).toHaveLength(100)
     expect(first?.text).toMatch(/…\nTags: web-apps, invoicing$/)
+  })
+
+  it('pages through a long window until has_more is false', async () => {
+    const page1 = JSON.parse(fixture('stackexchange-softwarerecs.json'))
+    const page2 = { ...page1, has_more: false, items: [{ ...page1.items[0], question_id: 91005 }] }
+    const f = fakeFetch((url) => json(url.searchParams.get('page') === '1' ? { ...page1, has_more: true } : page2))
+    const signals = await stackexchange.fetch(makeCtx(f, { config: oneSite }))
+
+    expect(f.calls.map((c) => new URL(c.url).searchParams.get('page'))).toEqual(['1', '2'])
+    expect(signals.map((s) => s.id)).toContain('stackexchange:softwarerecs:91005')
   })
 
   it('waits out backoff, skips a failing site and fails when all of them fail', async () => {

@@ -20,10 +20,11 @@ export interface Deps {
 const DEFAULT_CONFIG = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'config.json')
 
 const USAGE = `Usage:
-  node src/cli.ts fetch  [--sources hn,reddit,github,producthunt,stackexchange,rss] [--out signals.jsonl] [--config config.json]
+  node src/cli.ts fetch  [--sources hn,reddit,github,producthunt,stackexchange,rss] [--days N] [--out signals.jsonl] [--config config.json]
   node src/cli.ts export --out analyst-input.jsonl [--days N] [--limit N] [--from signals.jsonl] [--config config.json]
 
 fetch  stores signals in MongoDB (MONGODB_URI, MONGODB_DB), or in a JSONL file with --out.
+       --days N looks back N days instead of lookbackHours, for a one-off backfill.
 export ranks recent signals for the Analyst, from MongoDB or from a JSONL file with --from.`
 
 class UsageError extends Error {}
@@ -51,13 +52,20 @@ async function stepSummary(deps: Deps, markdown: string): Promise<void> {
 async function fetchCommand(args: string[], deps: Deps): Promise<number> {
   const { values } = parseArgs({
     args,
-    options: { config: { type: 'string' }, sources: { type: 'string' }, out: { type: 'string' } },
+    options: { config: { type: 'string' }, sources: { type: 'string' }, out: { type: 'string' }, days: { type: 'string' } },
     strict: true,
   })
   const config = await loadConfig(values.config ?? DEFAULT_CONFIG)
   const requested = parseSources(values.sources)
   const uri = deps.env.MONGODB_URI
   if (!values.out && !uri) throw new UsageError('set MONGODB_URI or pass --out <file.jsonl>')
+  // A one-off backfill. HN and Stack Exchange page back that far; Product Hunt stops at its limit, feeds only
+  // carry recent items, and GitHub keeps its own createdWithinDays window.
+  const days = positiveInt(values.days, '--days')
+  if (days !== undefined) {
+    deps.log(`looking back ${days} days instead of ${config.lookbackHours} hours`)
+    config.lookbackHours = days * 24
+  }
 
   const selected = SOURCE_NAMES.filter((name) => config[name].enabled && (!requested || requested.includes(name)))
   for (const name of requested ?? []) {

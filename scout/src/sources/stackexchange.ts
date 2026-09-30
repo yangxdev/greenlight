@@ -23,14 +23,17 @@ interface SeResponse {
 }
 
 const API = 'https://api.stackexchange.com/2.3/questions'
+/** A daily run needs one page; this only matters for a backfill (`fetch --days`). */
+const MAX_PAGES = 10
 
-async function questions(ctx: FetchContext, site: string): Promise<SeResponse> {
+async function questions(ctx: FetchContext, site: string, page: number): Promise<SeResponse> {
   const since = Math.floor(ctx.now.getTime() / 1000 - ctx.config.lookbackHours * 3600)
   const params = new URLSearchParams({
     site,
     fromdate: String(since),
     sort: 'creation',
     order: 'desc',
+    page: String(page),
     pagesize: String(ctx.config.stackexchange.pageSize),
     filter: 'withbody', // built-in filter: the default fields plus the question body
   })
@@ -59,31 +62,32 @@ export const stackexchange: Source = {
     let quota: number | null = null
 
     for (const site of sites) {
-      if (backoff > 0) await ctx.sleep(backoff * 1000)
-      let res: SeResponse
       try {
-        res = await questions(ctx, site)
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          if (backoff > 0) await ctx.sleep(backoff * 1000)
+          const res = await questions(ctx, site, page)
+          backoff = res.backoff ?? 0
+          quota = res.quota_remaining
+          for (const q of res.items) {
+            if (q.closed_date || q.score < minScore) continue
+            signals.push({
+              id: `stackexchange:${site}:${q.question_id}`,
+              source: 'stackexchange',
+              channel: site,
+              url: q.link,
+              link: q.link,
+              title: htmlToText(q.title),
+              text: textOf(q, ctx.config.maxTextLength),
+              score: q.score,
+              comments: q.answer_count,
+              createdAt: toIso(q.creation_date, ctx.now),
+            })
+          }
+          if (!res.has_more) break
+          if (page === MAX_PAGES) ctx.log(`stackexchange: ${site} has more than ${MAX_PAGES} pages; only the newest are kept`)
+        }
       } catch (error) {
         failures.push(`${site}: ${(error as Error).message}`)
-        continue
-      }
-      backoff = res.backoff ?? 0
-      quota = res.quota_remaining
-      if (res.has_more) ctx.log(`stackexchange: ${site} has more new questions than pageSize; only the newest are kept`)
-      for (const q of res.items) {
-        if (q.closed_date || q.score < minScore) continue
-        signals.push({
-          id: `stackexchange:${site}:${q.question_id}`,
-          source: 'stackexchange',
-          channel: site,
-          url: q.link,
-          link: q.link,
-          title: htmlToText(q.title),
-          text: textOf(q, ctx.config.maxTextLength),
-          score: q.score,
-          comments: q.answer_count,
-          createdAt: toIso(q.creation_date, ctx.now),
-        })
       }
     }
 

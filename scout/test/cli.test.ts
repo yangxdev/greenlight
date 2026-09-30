@@ -98,6 +98,16 @@ describe('scout fetch', () => {
     expect(d.logs.at(-1)).toBe('MongoDB: 5 new, 0 updated (5 fetched)')
   })
 
+  it('widens the lookback window with --days', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const d = deps({ fetch: f })
+    expect(await main(['fetch', '--out', join(dir, 'b.jsonl'), '--sources', 'hn', '--days', '30'], d)).toBe(0)
+    const since = Number(new URL(f.calls[0]?.url ?? '').searchParams.get('numericFilters')?.match(/created_at_i>(\d+)/)?.[1])
+    expect(since).toBe(NOW.getTime() / 1000 - 30 * 86_400)
+    expect(d.logs[0]).toBe('looking back 30 days instead of 26 hours')
+    expect(await main(['fetch', '--out', join(dir, 'b.jsonl'), '--days', '0'], d)).toBe(2)
+  })
+
   it('exits 0 when some sources fail and 1 when all fail', async () => {
     const out = join(dir, 's.jsonl')
     const partial = deps({ fetch: fakeFetch((url) => (url.hostname === 'api.github.com' ? undefined : fixtureRoutes(url))) })
