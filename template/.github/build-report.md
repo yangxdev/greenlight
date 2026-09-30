@@ -37,7 +37,7 @@ Package, version, and why it was needed. "None" if none.
 
 ## Manual setup required before deploy
 
-For example: `wrangler r2 bucket create …`, `wrangler pages secret put MONGODB_URI`, Atlas network access. "None" if none.
+For example: `wrangler r2 bucket create …`, `npx wrangler secret put MONGODB_URI`, Atlas network access. "None" if none.
 
 ## Blockers / open questions
 

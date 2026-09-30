@@ -6,7 +6,7 @@ export interface Ctx {
 }
 
 export interface ObserverConfig {
-  /** host (e.g. "my-app.pages.dev") -> Cloudflare Web Analytics site tag, for hosts the API can't match. */
+  /** host (e.g. "my-app.you.workers.dev") -> Cloudflare Web Analytics site tag, for hosts the API can't match. */
   siteTags: Record<string, string>
   probeTimeoutMs: number
   probeRetentionDays: number
@@ -18,7 +18,7 @@ export interface Product {
   title: string
   /** owner/name from the Architect's `greenlight:repo=` marker. */
   repo: string | null
-  /** https://<project>.pages.dev from the Publisher's `greenlight:url=` marker (or its "live at" text). */
+  /** https://<worker>.<account>.workers.dev from the Publisher's `greenlight:url=` marker (or its "live at" text). */
   url: string | null
   /** When the Publisher first reported it live (ISO). */
   liveSince: string | null

@@ -1,4 +1,4 @@
-/** Thin fetch wrapper for same-origin Pages Functions under /api. */
+/** Thin fetch wrapper for the same-origin Worker API under /api. */
 export async function apiGet<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`/api${path}`, { ...init, headers: { accept: 'application/json', ...init?.headers } })
   if (!res.ok) {

@@ -28,8 +28,8 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
 3. **Design for the Factory.** Every task names the files it touches, is completable in under about an hour,
    leaves `npm run check` green, and references the acceptance criteria it satisfies. Order: data/types →
    API functions → slices → UI → polish. The first task must produce something testable.
-4. **Acceptance criteria are tests.** Write them as Given/When/Then, observable in jsdom or by calling a Pages
-   Function handler. No criterion may need real network, real Atlas or real R2.
+4. **Acceptance criteria are tests.** Write them as Given/When/Then, observable in jsdom or by calling the Worker's
+   `/api` handler. No criterion may need real network, real Atlas or real R2.
 5. **Stay in the stack.** Use only what `CLAUDE.md` allows. If a dependency is truly needed, name it and justify it
    in the task. Keep `GET /api/health` in Routes.
 6. **Be concrete.** Real field names, real routes, real copy for the main headline and empty states. No "TBD".

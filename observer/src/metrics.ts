@@ -104,7 +104,7 @@ async function measure(
   const label = `#${product.issue}`
 
   if (!product.url) {
-    notes.push(`${label}: labelled live but no pages.dev URL recorded on the issue.`)
+    notes.push(`${label}: labelled live but no app URL recorded on the issue.`)
   } else {
     base.current = await probe(ctx, product.url, config.probeTimeoutMs)
     if (store) {
@@ -124,7 +124,7 @@ async function measure(
         notes.push(`${label}: traffic query failed (${message(error)}).`)
       }
     } else if (hasCloudflare) {
-      notes.push(`${label}: no Web Analytics site for ${host}. Enable Web Analytics on the Pages project or add it to observer/config.json.`)
+      notes.push(`${label}: no Web Analytics site for ${host}. Add one in Cloudflare Web Analytics and set its token as the product repo's CF_BEACON_TOKEN variable (see greenlight README), or map it in observer/config.json.`)
     }
   }
 

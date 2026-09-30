@@ -39,7 +39,7 @@ Max 10. Every task lists the acceptance criteria it satisfies.
 ### Task 1: <title>
 
 - **Do:** …
-- **Files:** `src/features/…`, `functions/api/…`
+- **Files:** `src/features/…`, `worker/routes/…`
 - **Satisfies:** AC1, AC2
 
 ### Task 2: <title>

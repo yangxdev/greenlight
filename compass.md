@@ -18,10 +18,11 @@ The agents treat every line here as a hard constraint unless it says "prefer".
 
 - TypeScript everywhere.
 - Frontend: React + Vite + Redux Toolkit + Tailwind CSS.
-- Server: Cloudflare Pages Functions (Workers runtime). No long-running servers, no containers.
+- Server: a Cloudflare Worker serving `/api/*` next to the static app (Workers static assets, like waypoint and
+  yangxdev.com). No long-running servers, no containers.
 - Data: MongoDB Atlas free tier (M0), official driver, one client per request. D1 is the fallback.
 - Files: Cloudflare R2.
-- Hosting/CI: Cloudflare Pages, GitHub Actions.
+- Hosting/CI: Cloudflare Workers (`*.workers.dev`), GitHub Actions.
 - Tests: Vitest + Testing Library. Lint: ESLint.
 
 ## Look & feel
@@ -47,7 +48,8 @@ so blueprints should build with it, not restyle it.
 ## Budget (hard limits)
 
 - €0 beyond the Claude Pro plan. Free tiers only: GitHub, Cloudflare (Pages/Workers/R2/D1), MongoDB Atlas M0.
-- No paid APIs, no API keys that bill per call, no paid domains (use `*.pages.dev`).
+- No paid APIs, no API keys that bill per call, no paid domains (use `*.workers.dev`).
+- Never Render.com: its free hours are per workspace and already spent on waypoint and kiroku.
 - The MVP must fit about one day of Factory work: at most 10 tasks and 3 screens.
 
 ## No-go list (never build)
@@ -76,5 +78,5 @@ things that are useful with zero sign-up.
 
 ## Definition of shipped
 
-Live on `*.pages.dev`, `/api/health` green, README explains the product in one paragraph, and the link was
+Live on `*.workers.dev`, `/api/health` green, README explains the product in one paragraph, and the link was
 posted in at least one community from "Reachable users".

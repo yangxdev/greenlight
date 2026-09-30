@@ -8,7 +8,7 @@
 
 | Product | Issue | URL | Uptime (7d) | Visits (7d) | Δ vs last week | Key action (7d) | Verdict |
 |---------|-------|-----|-------------|-------------|----------------|-----------------|---------|
-| … | #n | https://….pages.dev | 100% | 0 | – | 0 | keep / improve / archive |
+| … | #n | https://….workers.dev | 100% | 0 | – | 0 | keep / improve / archive |
 
 ## Pipeline
 

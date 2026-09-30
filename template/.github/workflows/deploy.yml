@@ -1,11 +1,11 @@
-# Publisher: every push to main (normally the Inspector's merge) goes to Cloudflare Pages,
-# then gets smoke-tested and reported to the greenlight issue. No AI.
+# Publisher: every push to main (normally the Inspector's merge) is deployed as a Cloudflare Worker with
+# static assets (wrangler.jsonc), then smoke-tested and reported to the greenlight issue. No AI.
 #
 #   gate    (PAT)                 skip until the product has actually been built (issue state), or
 #                                 when the Cloudflare secrets are missing
 #   build   (no secrets)          npm ci + vite build, dist/ uploaded as an artifact
-#   deploy  (Cloudflare token)    never runs repository code: `npm ci --ignore-scripts` (for Function
-#                                 dependencies only) + a pinned wrangler outside the repo
+#   deploy  (Cloudflare token)    never runs repository code: `npm ci --ignore-scripts` (so wrangler can bundle
+#                                 the Worker's dependencies) + a pinned wrangler installed outside the repo
 #   report  (PAT)                 comments the live URL and labels "live", or "stuck" on failure
 name: Publisher
 
@@ -24,7 +24,7 @@ permissions:
 env:
   GREENLIGHT_REPO: ${{ vars.GREENLIGHT_REPO }}
   GREENLIGHT_ISSUE: ${{ vars.GREENLIGHT_ISSUE }}
-  WRANGLER_VERSION: 4.143.1
+  WRANGLER_VERSION: 4.144.0
 
 jobs:
   gate:
@@ -72,7 +72,11 @@ jobs:
           node-version: 22
           package-manager-cache: false
       - run: npm ci
-      - run: npm run build
+      - name: Build
+        env:
+          # Cloudflare Web Analytics beacon token for this product (a public value, set as a repo variable).
+          VITE_CF_BEACON_TOKEN: ${{ vars.CF_BEACON_TOKEN }}
+        run: npm run build
       - uses: actions/upload-artifact@v7
         with:
           name: dist
@@ -100,7 +104,7 @@ jobs:
           node-version: 22
           package-manager-cache: false
 
-      - name: Install Function dependencies (no install scripts)
+      - name: Install Worker dependencies (no install scripts)
         run: npm ci --ignore-scripts
 
       - uses: actions/download-artifact@v8
@@ -111,32 +115,27 @@ jobs:
       - name: Install wrangler (outside the repo)
         run: npm install --prefix "$RUNNER_TEMP/wrangler" --no-audit --no-fund "wrangler@${WRANGLER_VERSION}"
 
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy the Worker
         id: deploy
         run: |
           wrangler="$RUNNER_TEMP/wrangler/node_modules/.bin/wrangler"
-          name=$(sed -nE 's/^name[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' wrangler.toml | head -n1)
-          [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,57}$ ]] || { echo "::error::invalid Pages project name '$name' in wrangler.toml"; exit 1; }
-          api="https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/pages/projects/${name}"
-          project() { curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" "$api"; }
+          name=$(sed -nE 's/^[[:space:]]*"name"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' wrangler.jsonc | head -n1)
+          [[ "$name" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]] || { echo "::error::invalid Worker name '$name' in wrangler.jsonc"; exit 1; }
 
-          if [ "$(project | jq -r '.success')" != "true" ]; then
-            echo "Creating Pages project $name"
-            "$wrangler" pages project create "$name" --production-branch main
-          fi
+          # Reads wrangler.jsonc: bundles worker/index.ts (esbuild, no code runs) and uploads ./dist as the assets.
+          "$wrangler" deploy
 
-          "$wrangler" pages deploy dist --project-name "$name" --branch main \
-            --commit-hash "$GITHUB_SHA" --commit-message "$(git log -1 --format=%s | cut -c1-200)"
-
-          subdomain=$(project | jq -r '.result.subdomain // empty')
-          [ -n "$subdomain" ] || { echo "::error::could not read the project's pages.dev subdomain"; exit 1; }
-          echo "url=https://${subdomain}" >> "$GITHUB_OUTPUT"
+          # The public URL is https://<worker>.<account subdomain>.workers.dev.
+          account=$(curl -sS -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/workers/subdomain" | jq -r '.result.subdomain // empty')
+          [ -n "$account" ] || { echo "::error::no workers.dev subdomain on this account (Workers & Pages → Settings → Subdomain)"; exit 1; }
+          echo "url=https://${name}.${account}.workers.dev" >> "$GITHUB_OUTPUT"
 
       - name: Smoke test
         env:
           URL: ${{ steps.deploy.outputs.url }}
         run: |
-          # New pages.dev subdomains can take a few minutes to resolve.
+          # A brand-new workers.dev hostname can take a minute or two to answer.
           for i in $(seq 1 30); do
             if curl -fsS --max-time 10 "$URL/api/health" | jq -e '.ok == true' >/dev/null \
               && curl -fsS --max-time 10 -o /dev/null "$URL/"; then

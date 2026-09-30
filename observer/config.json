@@ -1,5 +1,5 @@
 {
-  "_comment": "siteTags maps a product host (e.g. my-app.pages.dev) to its Cloudflare Web Analytics site tag (32 hex chars, visible in the dashboard URL). Only needed when automatic discovery via the API can't match the host.",
+  "_comment": "siteTags maps a product host (e.g. my-app.you.workers.dev) to its Cloudflare Web Analytics site tag (32 hex chars, visible in the dashboard URL). Only needed when automatic discovery via the API can't match the host.",
   "siteTags": {},
   "probeTimeoutMs": 15000,
   "probeRetentionDays": 35

@@ -2,7 +2,7 @@
 
 A personal pipeline that turns internet signals into small shipped web products, mostly run by AI agents,
 on €0 beyond a Claude Pro plan. Everything runs on personal accounts using only free tiers: GitHub
-(Issues, Projects, Actions), Cloudflare Pages/Workers/R2, and MongoDB Atlas M0.
+(Issues, Projects, Actions), Cloudflare Workers/R2/Web Analytics, and MongoDB Atlas M0.
 
 ```
  Scout ──► Analyst ──► Critic ──► Board ──► Architect ──► Factory ──► Inspector ──► Publisher ──► Observer
@@ -48,7 +48,7 @@ any state ──🧑──► archived
 | `blueprint-ready` | Architect | Review/edit `blueprint.md` in the product repo |
 | `blueprint-ok` | **you** | `factory-dispatch.yml` checks nothing else is `building`, then triggers the product's Factory |
 | `building` | factory-dispatch | The Factory is implementing the blueprint. **Only one issue at a time.** |
-| `live` | Publisher | Deployed to `*.pages.dev` and `/api/health` answered `{ ok: true }` |
+| `live` | Publisher | Deployed to `<name>.<you>.workers.dev` and `/api/health` answered `{ ok: true }` |
 | `stuck` | any workflow | Automation gave up. The issue comment links the failed run or PR |
 | `archived` | you · Observer suggestion | Dropped or retired. Close the issue too |
 
@@ -80,11 +80,12 @@ scout/                      Scout: HN, Reddit, GitHub, Product Hunt, RSS fetcher
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
   CLAUDE.md                 stack conventions, R2/Mongo usage, testing rules, definition of done
-  src/ functions/ shared/   Vite + React + RTK + Tailwind + TS app, Pages Functions, shared types
+  src/ worker/ shared/      Vite + React + RTK + Tailwind + TS app, the /api Worker, shared types
+  wrangler.jsonc            Cloudflare Worker with static assets (same shape as waypoint / yangxdev.com)
   .github/workflows/
     factory.yml             build from blueprint / fix from Inspector findings
     inspector.yml           checks + AI review on every PR, merge or send back
-    deploy.yml              Publisher: Cloudflare Pages deploy, smoke test, "live"
+    deploy.yml              Publisher: `wrangler deploy`, smoke test, "live"
   .github/build-report.md
 ```
 
@@ -128,9 +129,9 @@ snapshot.
      yourself. On **fail** it dispatches `greenlight-fix`, and the Factory reads the findings comment, fixes, and pushes
      to the same branch, which re-triggers the Inspector. After `INSPECTOR_MAX_ROUNDS` (3) failed fix rounds, or if
      the AI review can't finish (e.g. usage limit), the issue becomes `stuck`.
-7. **Publisher** (`deploy.yml`, on push to `main`, no AI): builds, creates the Pages project on first deploy, runs
-   `wrangler pages deploy`, smoke-tests `https://<project>.pages.dev/api/health` and `/`, comments the live URL, and
-   sets `live`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
+7. **Publisher** (`deploy.yml`, on push to `main`, no AI): builds the app (adding the Web Analytics beacon when the
+   product has a `CF_BEACON_TOKEN` variable), runs `wrangler deploy` (Worker + static assets from `wrangler.jsonc`),
+   smoke-tests `https://<name>.<you>.workers.dev/api/health` and `/`, comments the live URL, and sets `live`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
    Cloudflare secrets are missing.
 8. **Observer**:
    - `uptime.yml` (every 6 hours, no AI) probes each `live` product's `/api/health` and `/` and stores the result in
@@ -144,7 +145,7 @@ snapshot.
      board-only report is written instead.
 
 Things the Factory can't do for you are listed under "Manual setup required" in the PR's build report: creating an R2
-bucket, `wrangler pages secret put MONGODB_URI`, and Atlas network access.
+bucket, `npx wrangler secret put MONGODB_URI`, and Atlas network access.
 
 ### Usage limits
 
@@ -226,8 +227,8 @@ Settings → Secrets and variables → Actions → **New repository secret**:
 |--------|-------|-------|
 | `CLAUDE_CODE_OAUTH_TOKEN` | output of `claude setup-token` | 1 |
 | `GREENLIGHT_TOKEN` | the fine-grained PAT | 1 |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → custom token with **Account › Cloudflare Pages › Edit** and **Account › Account Analytics › Read** (for the Observer) | 2, 4 |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID | 2 |
+| `CLOUDFLARE_API_TOKEN` | Cloudflare → My Profile → API Tokens → **Create Token** → template **Edit Cloudflare Workers**, then add **Account › Account Analytics › Read** (for the Observer) | 2, 4 |
+| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID. That page also shows your `*.workers.dev` subdomain, which must exist | 2 |
 
 The Architect copies all four into each product repo it creates. Product repos created before you add a secret need it
 set by hand, or you can re-apply `approved` (the Architect reuses the existing repo and re-copies secrets).
@@ -283,10 +284,14 @@ username in `userAgent` and pick subreddits and feeds where your target users ta
 2. Actions → **Ideas** → *Run workflow*. It works without MongoDB too, using a fresh fetch. Expect 0–3 new `idea`
    issues and an `analysis/<date>.md` commit. An empty week is normal while `compass.md` is still generic.
 3. Add `approved` to an idea you like to start the Architect.
-4. Once something is `live`: in Cloudflare, open Workers & Pages → the project → **Metrics** → enable **Web Analytics**
-   (free, no code change). Then run Actions → **Observer** by hand once and pin the **Greenlight weekly reports** issue
-   it creates. If the report notes "no Web Analytics site for …", copy the site tag from the Web Analytics dashboard
-   URL into `observer/config.json` → `siteTags`.
+4. Once something is `live`, add traffic numbers (free, cookie-less):
+   - Cloudflare → **Web Analytics** → *Add a site* → the product's hostname (`<name>.<you>.workers.dev`) → copy the
+     **token** from the JS snippet it shows.
+   - In the product repo, set the Actions **variable** `CF_BEACON_TOKEN` to that token, then re-run its **Publisher**
+     workflow. The build adds the beacon script; without the variable, nothing is injected.
+   - Run Actions → **Observer** by hand once and pin the **Greenlight weekly reports** issue it creates. If the report
+     notes "no Web Analytics site for …", copy the site tag from the Web Analytics dashboard URL into
+     `observer/config.json` → `siteTags`.
 
 ## Roadmap
 

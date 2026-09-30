@@ -51,7 +51,7 @@ describe('parseProductComments', () => {
     ).toEqual({ repo: 'me/app', url: 'https://app.pages.dev', liveSince: '2026-09-02T00:00:00Z' })
   })
 
-  it('falls back to a pages.dev link in a Publisher comment, and ignores other links', () => {
+  it('falls back to a workers.dev or pages.dev link in a Publisher comment, and ignores other links', () => {
     expect(
       parseProductComments([
         { body: 'look at https://other.pages.dev', created_at: '2026-09-01T00:00:00Z' },
@@ -59,6 +59,11 @@ describe('parseProductComments', () => {
         { body: null, created_at: '2026-09-04T00:00:00Z' },
       ]),
     ).toEqual({ repo: null, url: 'https://app-x1.pages.dev', liveSince: '2026-09-03T00:00:00Z' })
+    expect(
+      parseProductComments([
+        { body: '🚀 **Publisher:** live at https://invoice-nudge.yangxdev.workers.dev (smoke test passed)', created_at: '2026-10-01T00:00:00Z' },
+      ]).url,
+    ).toBe('https://invoice-nudge.yangxdev.workers.dev')
   })
 })
 
