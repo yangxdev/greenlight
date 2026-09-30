@@ -20,6 +20,10 @@ export function configWith(patch: (c: ScoutConfig) => void): ScoutConfig {
   return config
 }
 
+/** Credentials and a filled-in user agent: what the reddit source needs before it makes any request. */
+export const REDDIT_ENV = { REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'secret' }
+export const TEST_USER_AGENT = 'test:greenlight-scout:0.1.0 (by /u/tester)'
+
 export interface Call {
   url: string
   init: RequestInit | undefined
@@ -51,7 +55,10 @@ export function fixtureRoutes(url: URL): Response | undefined {
   if (url.hostname === 'hn.algolia.com') {
     return json(fixture(url.searchParams.get('tags') === 'ask_hn' ? 'hn-ask.json' : 'hn-stories.json'))
   }
-  if (url.hostname === 'www.reddit.com' && url.pathname.endsWith('/top.json')) return json(fixture('reddit-smallbusiness.json'))
+  if (url.hostname === 'www.reddit.com' && url.pathname === '/api/v1/access_token') {
+    return json({ access_token: 'tok', token_type: 'bearer', expires_in: 86400 })
+  }
+  if (url.hostname === 'oauth.reddit.com' && url.pathname.endsWith('/top')) return json(fixture('reddit-smallbusiness.json'))
   if (url.hostname === 'api.github.com') return json(fixture('github-search.json'))
   if (url.hostname === 'www.producthunt.com' && url.pathname === '/feed') return xml(fixture('producthunt-feed.xml'))
   if (url.hostname === 'lobste.rs') return xml(fixture('rss-lobsters.xml'))

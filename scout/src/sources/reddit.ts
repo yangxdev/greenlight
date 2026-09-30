@@ -22,13 +22,10 @@ interface RedditListing {
 }
 
 /**
- * Application-only OAuth (client_credentials). Reddit often blocks anonymous .json requests from
- * cloud IPs such as GitHub Actions, so credentials are strongly recommended.
+ * Application-only OAuth (client_credentials). Anonymous `.json` listings now return 403 everywhere, and new
+ * credentials need Reddit's approval (see scout/README.md), so there is no anonymous fallback.
  */
-async function appToken(ctx: FetchContext): Promise<string | null> {
-  const id = ctx.env.REDDIT_CLIENT_ID
-  const secret = ctx.env.REDDIT_CLIENT_SECRET
-  if (!id || !secret) return null
+async function appToken(ctx: FetchContext, id: string, secret: string): Promise<string> {
   const res = await request(ctx, 'https://www.reddit.com/api/v1/access_token', {
     method: 'POST',
     headers: {
@@ -46,8 +43,17 @@ export const reddit: Source = {
   name: 'reddit',
   async fetch(ctx) {
     const { subreddits, limit, minScore } = ctx.config.reddit
-    const token = await appToken(ctx)
-    if (!token) ctx.log('reddit: no REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET, trying anonymous .json (often blocked from CI)')
+    const id = ctx.env.REDDIT_CLIENT_ID
+    const secret = ctx.env.REDDIT_CLIENT_SECRET
+    if (!id || !secret) {
+      // Skipped, not failed: waiting on Reddit's approval shouldn't flag every daily run.
+      ctx.log('reddit: skipped, no REDDIT_CLIENT_ID/REDDIT_CLIENT_SECRET (API access needs approval, see scout/README.md)')
+      return []
+    }
+    if (ctx.config.userAgent.includes('CHANGE_ME')) {
+      throw new Error('set your Reddit username in config.json userAgent; Reddit requires "(by /u/<name>)"')
+    }
+    const token = await appToken(ctx, id, secret)
     const cutoff = ctx.now.getTime() - ctx.config.lookbackHours * 3600 * 1000
     const signals: Signal[] = []
     const failures: string[] = []
@@ -55,12 +61,11 @@ export const reddit: Source = {
     for (const [i, sub] of subreddits.entries()) {
       if (i > 0) await ctx.sleep(1100) // stay well under Reddit's rate limits
       const params = new URLSearchParams({ t: 'day', limit: String(limit), raw_json: '1' })
-      const url = token
-        ? `https://oauth.reddit.com/r/${sub}/top?${params}`
-        : `https://www.reddit.com/r/${sub}/top.json?${params}`
       let listing: RedditListing
       try {
-        listing = await getJson<RedditListing>(ctx, url, token ? { headers: { authorization: `bearer ${token}` } } : {})
+        listing = await getJson<RedditListing>(ctx, `https://oauth.reddit.com/r/${sub}/top?${params}`, {
+          headers: { authorization: `bearer ${token}` },
+        })
       } catch (error) {
         failures.push(`r/${sub}: ${(error as Error).message}`)
         continue

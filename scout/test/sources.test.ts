@@ -4,7 +4,18 @@ import { hn } from '../src/sources/hn.ts'
 import { producthunt } from '../src/sources/producthunt.ts'
 import { reddit } from '../src/sources/reddit.ts'
 import { rss } from '../src/sources/rss.ts'
-import { configWith, fakeFetch, fixture, fixtureRoutes, header, json, makeCtx, xml } from './helpers.ts'
+import {
+  configWith,
+  fakeFetch,
+  fixture,
+  fixtureRoutes,
+  header,
+  json,
+  makeCtx,
+  REDDIT_ENV,
+  TEST_USER_AGENT,
+  xml,
+} from './helpers.ts'
 
 const CUTOFF_EPOCH = 1790589600 // NOW - 26h
 
@@ -43,12 +54,12 @@ describe('hn', () => {
 
 describe('reddit', () => {
   const oneSub = configWith((c) => {
+    c.userAgent = TEST_USER_AGENT
     c.reddit.subreddits = ['smallbusiness']
   })
 
   it('keeps recent, non-stickied, SFW posts above minScore', async () => {
-    const ctx = makeCtx(fakeFetch(fixtureRoutes), { config: oneSub })
-    const signals = await reddit.fetch(ctx)
+    const signals = await reddit.fetch(makeCtx(fakeFetch(fixtureRoutes), { config: oneSub, env: REDDIT_ENV }))
 
     expect(signals.map((s) => s.id)).toEqual(['reddit:1ab001', 'reddit:1ab002'])
     expect(signals[0]).toMatchObject({
@@ -59,38 +70,46 @@ describe('reddit', () => {
     })
     expect(signals[0]?.link).toBe(signals[0]?.url)
     expect(signals[1]?.link).toBe('https://example.com/invoices')
-    expect(ctx.logs.join('\n')).toContain('anonymous')
   })
 
-  it('uses application-only OAuth when credentials are set', async () => {
-    const f = fakeFetch((url, init) => {
-      if (url.pathname === '/api/v1/access_token') {
-        expect(init?.method).toBe('POST')
-        expect(new Headers(init?.headers).get('authorization')).toBe(`Basic ${Buffer.from('id:secret').toString('base64')}`)
-        return json({ access_token: 'tok', token_type: 'bearer', expires_in: 86400 })
-      }
-      if (url.hostname === 'oauth.reddit.com') return json(fixture('reddit-smallbusiness.json'))
-      return undefined
-    })
-    const signals = await reddit.fetch(makeCtx(f, { config: oneSub, env: { REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'secret' } }))
+  it('uses application-only OAuth against oauth.reddit.com', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    await reddit.fetch(makeCtx(f, { config: oneSub, env: REDDIT_ENV }))
 
-    expect(signals).toHaveLength(2)
+    expect(f.calls[0]?.init?.method).toBe('POST')
+    expect(header(f.calls[0], 'authorization')).toBe(`Basic ${Buffer.from('id:secret').toString('base64')}`)
     expect(f.calls[1]?.url).toBe('https://oauth.reddit.com/r/smallbusiness/top?t=day&limit=50&raw_json=1')
     expect(header(f.calls[1], 'authorization')).toBe('bearer tok')
-    expect(header(f.calls[1], 'user-agent')).toMatch(/^greenlight-scout\//)
+    expect(header(f.calls[1], 'user-agent')).toBe(TEST_USER_AGENT)
+  })
+
+  it('is skipped, not failed, without credentials, and makes no requests', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const ctx = makeCtx(f, { config: oneSub })
+    expect(await reddit.fetch(ctx)).toEqual([])
+    expect(f.calls).toHaveLength(0)
+    expect(ctx.logs.join('\n')).toContain('reddit: skipped')
+  })
+
+  it('refuses to call Reddit while the user agent still says CHANGE_ME', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const placeholder = configWith((c) => void (c.userAgent = 'github-actions:greenlight-scout:0.1.0 (by /u/CHANGE_ME)'))
+    await expect(reddit.fetch(makeCtx(f, { config: placeholder, env: REDDIT_ENV }))).rejects.toThrow('set your Reddit username')
+    expect(f.calls).toHaveLength(0)
   })
 
   it('skips a failing subreddit but fails when all of them fail', async () => {
     const two = configWith((c) => {
+      c.userAgent = TEST_USER_AGENT
       c.reddit.subreddits = ['smallbusiness', 'private_sub']
     })
     const partial = fakeFetch((url) => (url.pathname.startsWith('/r/private_sub') ? json({ reason: 'private' }, 403) : fixtureRoutes(url)))
-    const ctx = makeCtx(partial, { config: two })
+    const ctx = makeCtx(partial, { config: two, env: REDDIT_ENV })
     expect(await reddit.fetch(ctx)).toHaveLength(2)
     expect(ctx.logs.some((l) => l.includes('skipped r/private_sub: HTTP 403'))).toBe(true)
 
-    const blocked = fakeFetch(() => new Response('blocked', { status: 403 }))
-    await expect(reddit.fetch(makeCtx(blocked, { config: two }))).rejects.toThrow('all subreddits failed')
+    const blocked = fakeFetch((url) => (url.hostname === 'oauth.reddit.com' ? new Response('blocked', { status: 403 }) : fixtureRoutes(url)))
+    await expect(reddit.fetch(makeCtx(blocked, { config: two, env: REDDIT_ENV }))).rejects.toThrow('all subreddits failed')
   })
 })
 

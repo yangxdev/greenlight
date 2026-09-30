@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -6,7 +6,7 @@ import { main, type Deps } from '../src/cli.ts'
 import type { RankedSignal } from '../src/rank.ts'
 import { readJsonl, type Store } from '../src/store.ts'
 import type { Signal } from '../src/types.ts'
-import { fakeFetch, fixtureRoutes, NOW } from './helpers.ts'
+import { configWith, fakeFetch, fixtureRoutes, NOW, REDDIT_ENV, TEST_USER_AGENT } from './helpers.ts'
 
 let dir: string
 beforeEach(async () => {
@@ -48,6 +48,17 @@ function memoryStore() {
   }
 }
 
+/** The shipped config with Reddit switched on and a test user agent, so every source runs. */
+async function redditReadyConfig(): Promise<string> {
+  const path = join(dir, 'config.json')
+  const config = configWith((c) => {
+    c.userAgent = TEST_USER_AGENT
+    c.reddit.enabled = true
+  })
+  await writeFile(path, JSON.stringify(config))
+  return path
+}
+
 function deps(patch: Partial<Deps> = {}): Deps & { logs: string[] } {
   const logs: string[] = []
   return {
@@ -65,8 +76,8 @@ function deps(patch: Partial<Deps> = {}): Deps & { logs: string[] } {
 describe('scout fetch', () => {
   it('collects every enabled source into a JSONL file', async () => {
     const out = join(dir, 'signals.jsonl')
-    const d = deps()
-    expect(await main(['fetch', '--out', out], d)).toBe(0)
+    const d = deps({ env: REDDIT_ENV })
+    expect(await main(['fetch', '--out', out, '--config', await redditReadyConfig()], d)).toBe(0)
 
     const signals = await readJsonl<Signal>(out)
     const sources = new Set(signals.map((s) => s.source))
@@ -117,7 +128,7 @@ describe('scout export', () => {
   it('ranks signals from a JSONL file for the Analyst', async () => {
     const raw = join(dir, 'signals.jsonl')
     const out = join(dir, 'analyst.jsonl')
-    await main(['fetch', '--out', raw], deps())
+    await main(['fetch', '--out', raw, '--config', await redditReadyConfig()], deps({ env: REDDIT_ENV }))
     const d = deps()
     expect(await main(['export', '--from', raw, '--out', out, '--limit', '5'], d)).toBe(0)
 

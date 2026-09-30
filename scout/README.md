@@ -19,12 +19,31 @@ Node 22.18+ runs the TypeScript directly, so there is no build step.
 | Source | Endpoint | Auth | Notes |
 |--------|----------|------|-------|
 | `hn` | Algolia `search_by_date`: stories ≥ `minPoints`, Ask HN ≥ `askMinPoints` | none | Ask HN gets a lower bar because that's where problems get described |
-| `reddit` | `/r/<sub>/top?t=day` for each subreddit in `config.json` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (app-only OAuth), else anonymous `.json` | Anonymous requests from GitHub Actions are often blocked. One failing subreddit is skipped |
+| `reddit` | `oauth.reddit.com/r/<sub>/top?t=day` for each subreddit in `config.json` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (app-only OAuth), which need Reddit's approval (see below) | Skipped, not failed, without credentials. One failing subreddit is skipped |
 | `github` | Search API: repos created in the last `createdWithinDays` with ≥ `minStars` | `GITHUB_TOKEN` (the workflow's own) | Stands in for "trending", which has no API |
 | `producthunt` | GraphQL API (votes, comments) | `PRODUCTHUNT_TOKEN` (developer token) | Falls back to the public Atom feed (no engagement numbers) |
 | `rss` | Any RSS 2.0 / RSS 1.0 / Atom feed in `config.json` | none | One failing feed is skipped |
 
 A source that fails is logged as a warning and the run continues. The run only fails when every source fails.
+
+## Reddit access
+
+Reddit closed self-service API keys in November 2025, and anonymous `.json` requests now return 403, so the Scout only
+reads Reddit with approved credentials. Until then the source logs `reddit: skipped` and the other sources carry on.
+
+1. Request access: <https://support.reddithelp.com/hc/en-us/requests/new?ticket_form_id=14868593862164> (open it in a
+   logged-in browser), role **Developer**. Devvit doesn't fit because the Scout runs off Reddit and only reads.
+2. Once approved: <https://www.reddit.com/prefs/apps> → *create another app* → type **script**, redirect URI
+   `http://localhost:8080`. The 14-character string under the name is `REDDIT_CLIENT_ID`; `secret` is
+   `REDDIT_CLIENT_SECRET`.
+3. In `config.json`, set `reddit.enabled` back to `true` and keep your username in `userAgent`. The source refuses to
+   run while it says `CHANGE_ME`.
+
+What the Scout does with Reddit, for the request and to stay inside it: once a day, one token request plus one
+`GET /r/<sub>/top?t=day&limit=50` per subreddit in `config.json`; no posting, voting or messaging. It stores no
+usernames. Post text lives in MongoDB for 30 days (TTL), and the idea cards in the repo keep only links and short quotes.
+Reddit data must never be used to train a model, which also means keeping model training off for the Claude account
+the agents run on.
 
 ## Data
 

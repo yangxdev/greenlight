@@ -6,7 +6,7 @@ describe('http', () => {
   it('sets the configured User-Agent', async () => {
     const f = fakeFetch(() => json({ ok: true }))
     await getJson(makeCtx(f), 'https://example.com/a')
-    expect(header(f.calls[0], 'user-agent')).toBe('greenlight-scout/0.1 (personal research bot; by /u/CHANGE_ME)')
+    expect(header(f.calls[0], 'user-agent')).toBe('github-actions:greenlight-scout:0.1.0 (by /u/CHANGE_ME)')
   })
 
   it('retries once on 429, honouring Retry-After', async () => {

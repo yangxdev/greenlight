@@ -1,6 +1,6 @@
 {
   "_comment": "Scout sources. Keys starting with _ are comments. Subreddit names go without r/. Tests validate this file.",
-  "userAgent": "greenlight-scout/0.1 (personal research bot; by /u/CHANGE_ME)",
+  "userAgent": "github-actions:greenlight-scout:0.1.0 (by /u/CHANGE_ME)",
   "lookbackHours": 26,
   "maxTextLength": 2000,
   "retentionDays": 30,
