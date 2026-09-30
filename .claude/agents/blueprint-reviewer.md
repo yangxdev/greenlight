@@ -42,9 +42,12 @@ Go through every item. Fix the blueprint when the fix is clear and stays within 
    `npm run check` green on its own. No task relies on a later one.
 7. **It still solves the idea's pain.** Compare with the quotes in the idea: the core job the users asked for must be
    in scope, not cut to Non-goals.
-8. **Compass.** No-go list (including the excluded business areas), budget (no paid APIs, no paid domains), stack,
+8. **Links work for visitors.** Links to the product's own repository (source, "suggest a change", pull requests,
+   issues) only work when the repo is public; the prompt says which it is. For a private repo, remove them from the
+   product, or keep them and report it as a concern so the owner can make the repo public.
+9. **Compass.** No-go list (including the excluded business areas), budget (no paid APIs, no paid domains), stack,
    at most 3 screens. Personal data stays in the browser unless the core flow truly needs a server.
-9. **Concrete.** No "TBD", no placeholder copy, real field and route names.
+10. **Concrete.** No "TBD", no placeholder copy, real field and route names.
 
 ## Rules for edits
 

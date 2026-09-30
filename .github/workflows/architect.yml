@@ -33,6 +33,7 @@ jobs:
     outputs:
       full: ${{ steps.repo.outputs.full }}
       name: ${{ steps.repo.outputs.name }}
+      visibility: ${{ steps.context.outputs.visibility }}
     steps:
       - name: Check required secrets
         env:
@@ -128,10 +129,13 @@ jobs:
           done
 
       - name: Export product context for the Architect
+        id: context
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           FULL: ${{ steps.repo.outputs.full }}
         run: |
+          # Links to the repo (source, "suggest a change") only work for visitors when it is public.
+          echo "visibility=$(gh repo view "$FULL" --json visibility --jq '.visibility | ascii_downcase')" >> "$GITHUB_OUTPUT"
           git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${FULL}.git" "$RUNNER_TEMP/product"
           mkdir -p "$RUNNER_TEMP/context"
           for f in CLAUDE.md package.json blueprint.md; do
@@ -190,6 +194,9 @@ jobs:
             - templates/blueprint.md: the required blueprint structure
             - product/CLAUDE.md and product/package.json: the stack and conventions the Factory will follow
             - product/blueprint.md, if it exists: the previous version. Revise it using the owner's clarifications.
+
+            The product repo ${{ needs.scaffold.outputs.full }} is ${{ needs.scaffold.outputs.visibility }}: visitors can
+            open links to it and send pull requests only if it is public.
 
             Output: write product/blueprint.md for the product repo ${{ needs.scaffold.outputs.full }}.
             Do not create, edit or delete any other file.
@@ -259,6 +266,9 @@ jobs:
             - .greenlight-run/issue.md: the approved idea (issue #${{ github.event.issue.number }}) and owner clarifications
             - compass.md, templates/blueprint.md, .claude/agents/architect.md
             - product/CLAUDE.md and product/package.json
+
+            The product repo is ${{ needs.scaffold.outputs.visibility }}: visitors can open links to it and send pull
+            requests only if it is public.
 
             Edit only product/blueprint.md, then return the structured result.
           claude_args: >-
