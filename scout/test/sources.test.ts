@@ -6,6 +6,7 @@ import { reddit } from '../src/sources/reddit.ts'
 import { rss } from '../src/sources/rss.ts'
 import { stackexchange } from '../src/sources/stackexchange.ts'
 import {
+  NOW,
   configWith,
   fakeFetch,
   fixture,
@@ -21,9 +22,13 @@ import {
 const CUTOFF_EPOCH = 1790589600 // NOW - 26h
 
 describe('hn', () => {
+  const storiesOnly = configWith((c) => {
+    c.hn.comments.enabled = false
+  })
+
   it('merges the story and Ask HN queries and skips untitled hits', async () => {
     const f = fakeFetch(fixtureRoutes)
-    const signals = await hn.fetch(makeCtx(f))
+    const signals = await hn.fetch(makeCtx(f, { config: storiesOnly }))
 
     expect(signals.map((s) => s.id).sort()).toEqual(['hn:45100001', 'hn:45100002', 'hn:45100004'])
     const [stories, asks] = f.calls.map((c) => new URL(c.url).searchParams)
@@ -39,7 +44,7 @@ describe('hn', () => {
       const page = Number(url.searchParams.get('page'))
       return json({ hits: page === 0 ? stories.hits : [{ ...stories.hits[0], objectID: '45100099' }], nbPages: 2 })
     })
-    const signals = await hn.fetch(makeCtx(f))
+    const signals = await hn.fetch(makeCtx(f, { config: storiesOnly }))
 
     const storyPages = f.calls.filter((c) => new URL(c.url).searchParams.get('tags') === 'story')
     expect(storyPages.map((c) => new URL(c.url).searchParams.get('page'))).toEqual(['0', '1'])
@@ -47,7 +52,7 @@ describe('hn', () => {
   })
 
   it('normalises link posts and self posts', async () => {
-    const signals = await hn.fetch(makeCtx(fakeFetch(fixtureRoutes)))
+    const signals = await hn.fetch(makeCtx(fakeFetch(fixtureRoutes), { config: storiesOnly }))
     expect(signals.find((s) => s.id === 'hn:45100001')).toEqual({
       id: 'hn:45100001',
       source: 'hn',
@@ -64,6 +69,47 @@ describe('hn', () => {
     expect(ask?.channel).toBe('ask_hn')
     expect(ask?.link).toBe(ask?.url)
     expect(ask?.text).toBe("I'm tired of keeping glossaries in a spreadsheet & emailing them around.\nIs there a tool that does this?")
+  })
+
+  it('turns the most-replied top-level comments of busy Ask HN threads into signals', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const signals = await hn.fetch(makeCtx(f))
+    const comments = signals.filter((s) => s.channel === 'ask_hn_comment')
+
+    // Most replies first; "+1" (too short) and the deleted comment are skipped.
+    expect(comments.map((s) => s.id)).toEqual(['hn:45100101', 'hn:45100102', 'hn:45100105'])
+    expect(comments[0]).toEqual({
+      id: 'hn:45100101',
+      source: 'hn',
+      channel: 'ask_hn_comment',
+      url: 'https://news.ycombinator.com/item?id=45100101',
+      link: 'https://news.ycombinator.com/item?id=45100101',
+      title: 'Ask HN reply',
+      text: "Same here. I gave up on the CAT tool's termbase and keep a spreadsheet per client, but I still paste terms manually into every job.",
+      score: 0,
+      comments: 3,
+      createdAt: '2026-09-29T06:30:00.000Z',
+      context: 'Ask HN: How do you handle client glossaries as a translator?',
+    })
+
+    const threadQuery = f.calls.map((c) => new URL(c.url)).find((u) => u.searchParams.get('numericFilters')?.includes('num_comments'))
+    expect(threadQuery?.searchParams.get('numericFilters')).toBe(`created_at_i>${NOW.getTime() / 1000 - 3 * 86_400},num_comments>=20`)
+    // The 9-comment thread in the fixture is below minComments, so only one thread is opened.
+    expect(f.calls.filter((c) => c.url.includes('/api/v1/items/')).map((c) => c.url)).toEqual(['https://hn.algolia.com/api/v1/items/45100002'])
+  })
+
+  it('caps comments per thread and keeps the stories when comments fail', async () => {
+    const two = configWith((c) => {
+      c.hn.comments.perThread = 2
+    })
+    const capped = await hn.fetch(makeCtx(fakeFetch(fixtureRoutes), { config: two }))
+    expect(capped.filter((s) => s.channel === 'ask_hn_comment')).toHaveLength(2)
+
+    const broken = fakeFetch((url) => (url.pathname.startsWith('/api/v1/items/') ? json({ error: 'boom' }, 500) : fixtureRoutes(url)))
+    const ctx = makeCtx(broken)
+    const signals = await hn.fetch(ctx)
+    expect(signals.map((s) => s.id).sort()).toEqual(['hn:45100001', 'hn:45100002', 'hn:45100004'])
+    expect(ctx.logs.some((l) => l.startsWith('hn: skipped comments of 45100002: HTTP 500'))).toBe(true)
   })
 })
 

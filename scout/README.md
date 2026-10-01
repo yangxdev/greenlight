@@ -18,7 +18,7 @@ Node 22.18+ runs the TypeScript directly, so there is no build step.
 
 | Source | Endpoint | Auth | Notes |
 |--------|----------|------|-------|
-| `hn` | Algolia `search_by_date`: stories ≥ `minPoints`, Ask HN ≥ `askMinPoints` | none | Ask HN gets a lower bar because that's where problems get described |
+| `hn` | Algolia `search_by_date`: stories ≥ `minPoints`, Ask HN ≥ `askMinPoints`; then `items/<id>` for the `comments.maxThreads` (10) most discussed Ask HN threads of the last `comments.threadDays` (3) | none | Ask HN gets a lower bar because that's where problems get described. Each thread's `comments.perThread` (8) most-replied top-level comments become signals of their own (channel `ask_hn_comment`, title "Ask HN reply", the thread's title in `context`), skipping comments under `minLength` (80) characters. A comment failure never drops the stories |
 | `reddit` | `oauth.reddit.com/r/<sub>/top?t=day` for each subreddit in `config.json` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (app-only OAuth), which need Reddit's approval (see below) | Skipped, not failed, without credentials. One failing subreddit is skipped |
 | `github` | Search API: repos created in the last `createdWithinDays` with ≥ `minStars` | `GITHUB_TOKEN` (the workflow's own) | Stands in for "trending", which has no API |
 | `producthunt` | GraphQL API (votes, comments) | `PRODUCTHUNT_TOKEN` (developer token) | Falls back to the public Atom feed (no engagement numbers) |
@@ -62,8 +62,10 @@ through results (up to 1,000 per query) instead of stopping at the first page. S
 ## Data
 
 Each signal:
-`{ id, source, channel, url, link, title, text, score, comments, createdAt }`.
+`{ id, source, channel, url, link, title, text, score, comments, createdAt, context? }`.
 - `url` is the discussion (HN item, Reddit thread, and so on).
+- `context` is only set on replies: the title of the thread they answer. The Analyst reads it; ranking ignores it, so
+  a reply only counts as a complaint for its own words.
 - `link` is the canonicalised external target, and equals `url` for self posts.
 
 In MongoDB, `_id` is `<source>:<native id>`. Re-fetching refreshes `score`, `comments`, `text` and `lastSeenAt`, and never
@@ -72,12 +74,12 @@ Atlas M0's 512 MB.
 
 ## Export for the Analyst
 
-`export` takes the last `export.days` (7) of signals, leaves out `dropWithoutPain` channels (plain HN news,
-`hn:story`) that contain no pain phrase, and ranks the rest:
+`export` takes the last `export.days` (7) of signals, leaves out `dropWithoutPain` channels (plain HN news `hn:story`
+and Ask HN replies `hn:ask_hn_comment`) that contain no pain phrase, and ranks the rest:
 - 60% engagement percentile within the signal's own source (comments count double),
 - 40% `painPhrases` found in title and text (capped at 3),
-- +`questionBoost` (0.25, about two pain phrases) for `questionChannels`, where people ask for tools: Ask HN,
-  Stack Exchange, r/SomebodyMakeThis, r/AppIdeas,
+- +`questionBoost` (0.25, about two pain phrases) for `questionChannels`, where people ask for tools or describe
+  problems: Ask HN questions and replies, Stack Exchange, r/SomebodyMakeThis, r/AppIdeas,
 - +0.1 when the same `link` shows up on several sources (they're merged, see `alsoSeenIn`).
 
 It keeps at most `export.limit` (150) signals, with no source taking more than `maxSharePerSource` (40%), and cuts

@@ -52,6 +52,9 @@ export const xml = (body: string) => new Response(body, { headers: { 'content-ty
 
 /** Serves each fixture where the real API would answer. */
 export function fixtureRoutes(url: URL): Response | undefined {
+  if (url.hostname === 'hn.algolia.com' && url.pathname.startsWith('/api/v1/items/')) {
+    return url.pathname.endsWith('/45100002') ? json(fixture('hn-item.json')) : undefined
+  }
   if (url.hostname === 'hn.algolia.com') {
     return json(fixture(url.searchParams.get('tags') === 'ask_hn' ? 'hn-ask.json' : 'hn-stories.json'))
   }

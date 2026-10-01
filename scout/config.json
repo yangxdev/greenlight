@@ -8,7 +8,16 @@
     "enabled": true,
     "minPoints": 50,
     "askMinPoints": 10,
-    "hitsPerPage": 100
+    "hitsPerPage": 100,
+    "comments": {
+      "_comment": "Top-level comments of the most discussed Ask HN threads of the last few days, most-replied first. One request per thread.",
+      "enabled": true,
+      "threadDays": 3,
+      "minComments": 20,
+      "maxThreads": 10,
+      "perThread": 8,
+      "minLength": 80
+    }
   },
   "reddit": {
     "_comment": "Must match the subreddits declared in the Reddit API access request (see README). Ask Reddit before adding more.",
@@ -87,9 +96,9 @@
     "maxSharePerSource": 0.4,
     "maxTextLength": 600,
     "_questionChannels": "Where people ask for tools or describe problems: ranked up by questionBoost (about two pain phrases' worth). \"source\" or \"source:channel\".",
-    "questionChannels": ["hn:ask_hn", "stackexchange", "reddit:SomebodyMakeThis", "reddit:AppIdeas"],
+    "questionChannels": ["hn:ask_hn", "hn:ask_hn_comment", "stackexchange", "reddit:SomebodyMakeThis", "reddit:AppIdeas"],
     "questionBoost": 0.25,
-    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement.",
-    "dropWithoutPain": ["hn:story"]
+    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement; Ask HN comments without one are mostly tool recommendations.",
+    "dropWithoutPain": ["hn:story", "hn:ask_hn_comment"]
   }
 }

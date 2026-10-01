@@ -22,7 +22,14 @@ export function toUpsertOps(signals: Signal[], now: Date): AnyBulkWriteOperation
     updateOne: {
       filter: { _id: s.id },
       update: {
-        $set: { title: s.title, text: s.text, score: s.score, comments: s.comments, lastSeenAt: now },
+        $set: {
+          title: s.title,
+          text: s.text,
+          score: s.score,
+          comments: s.comments,
+          lastSeenAt: now,
+          ...(s.context === undefined ? {} : { context: s.context }),
+        },
         $setOnInsert: {
           source: s.source,
           channel: s.channel,
@@ -49,6 +56,7 @@ export function fromDoc(doc: SignalDoc): Signal {
     score: doc.score,
     comments: doc.comments,
     createdAt: doc.createdAt.toISOString(),
+    ...(doc.context === undefined ? {} : { context: doc.context }),
   }
 }
 

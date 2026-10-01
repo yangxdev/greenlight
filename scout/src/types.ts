@@ -7,7 +7,7 @@ export interface Signal {
   /** Stable id `<source>:<native id>`, used as the MongoDB `_id`. */
   id: string
   source: SourceName
-  /** Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`), repo language, Stack Exchange site. */
+  /** Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`, `ask_hn_comment`), repo language, Stack Exchange site. */
   channel: string
   /** Where the discussion lives: HN item, Reddit thread, repo page, Product Hunt post, feed item. */
   url: string
@@ -21,6 +21,19 @@ export interface Signal {
   comments: number
   /** ISO 8601 creation time at the source. */
   createdAt: string
+  /** For replies: the title of the thread they answer. Shown to the Analyst, never used for ranking. */
+  context?: string
+}
+
+export interface HnCommentsConfig {
+  enabled: boolean
+  /** Threads created within this many days (more for a longer `fetch --days`), so they have had time to fill up. */
+  threadDays: number
+  minComments: number
+  maxThreads: number
+  perThread: number
+  /** Shorter comments ("+1", "This.") are skipped. */
+  minLength: number
 }
 
 export interface FeedConfig {
@@ -36,7 +49,14 @@ export interface ScoutConfig {
   maxTextLength: number
   /** MongoDB TTL: signals are deleted this many days after first being seen. */
   retentionDays: number
-  hn: { enabled: boolean; minPoints: number; askMinPoints: number; hitsPerPage: number }
+  hn: {
+    enabled: boolean
+    minPoints: number
+    askMinPoints: number
+    hitsPerPage: number
+    /** Top-level comments of the most discussed recent Ask HN threads: that is where the complaints are. */
+    comments: HnCommentsConfig
+  }
   reddit: { enabled: boolean; subreddits: string[]; limit: number; minScore: number }
   github: { enabled: boolean; minStars: number; createdWithinDays: number; perPage: number }
   producthunt: { enabled: boolean; limit: number }

@@ -55,6 +55,7 @@ function feeds(value: Json, path: string): FeedConfig[] {
 export function parseConfig(raw: Json): ScoutConfig {
   const c = obj(raw, 'config')
   const hn = obj(c.hn, 'hn')
+  const hnComments = obj(hn.comments, 'hn.comments')
   const reddit = obj(c.reddit, 'reddit')
   const github = obj(c.github, 'github')
   const producthunt = obj(c.producthunt, 'producthunt')
@@ -87,6 +88,14 @@ export function parseConfig(raw: Json): ScoutConfig {
       minPoints: num(hn.minPoints, 'hn.minPoints'),
       askMinPoints: num(hn.askMinPoints, 'hn.askMinPoints'),
       hitsPerPage: num(hn.hitsPerPage, 'hn.hitsPerPage', 1),
+      comments: {
+        enabled: bool(hnComments.enabled, 'hn.comments.enabled'),
+        threadDays: num(hnComments.threadDays, 'hn.comments.threadDays', 1),
+        minComments: num(hnComments.minComments, 'hn.comments.minComments'),
+        maxThreads: num(hnComments.maxThreads, 'hn.comments.maxThreads', 1),
+        perThread: num(hnComments.perThread, 'hn.comments.perThread', 1),
+        minLength: num(hnComments.minLength, 'hn.comments.minLength'),
+      },
     },
     reddit: {
       enabled: bool(reddit.enabled, 'reddit.enabled'),

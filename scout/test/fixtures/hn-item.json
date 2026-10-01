@@ -1,0 +1,122 @@
+{
+  "id": 45100002,
+  "created_at": "2026-09-29T06:00:00.000Z",
+  "created_at_i": 1790661600,
+  "type": "story",
+  "author": "lingo",
+  "title": "Ask HN: How do you handle client glossaries as a translator?",
+  "url": null,
+  "text": "<p>I&#x27;m tired of keeping glossaries in a spreadsheet &amp; emailing them around.<p>Is there a tool that does this?",
+  "points": 64,
+  "parent_id": null,
+  "story_id": 45100002,
+  "children": [
+    {
+      "id": 45100105,
+      "created_at": "2026-09-29T07:40:00.000Z",
+      "created_at_i": 1790667600,
+      "type": "comment",
+      "author": "quiet",
+      "text": "<p>Our agency keeps one glossary per client in a shared drive folder, and every translator has a slightly different copy of it.</p>",
+      "points": null,
+      "parent_id": 45100002,
+      "story_id": 45100002,
+      "children": []
+    },
+    {
+      "id": 45100101,
+      "created_at": "2026-09-29T06:30:00.000Z",
+      "created_at_i": 1790663400,
+      "type": "comment",
+      "author": "terminologist",
+      "text": "<p>Same here. I gave up on the CAT tool&#x27;s termbase and keep a spreadsheet per client, but I still paste terms manually into every job.</p>",
+      "points": null,
+      "parent_id": 45100002,
+      "story_id": 45100002,
+      "children": [
+        {
+          "id": 45100201,
+          "created_at": "2026-09-29T06:45:00.000Z",
+          "type": "comment",
+          "author": "a",
+          "text": "<p>Same, it is a waste of time.</p>",
+          "points": null,
+          "parent_id": 45100101,
+          "story_id": 45100002,
+          "children": [
+            {
+              "id": 45100301,
+              "created_at": "2026-09-29T07:00:00.000Z",
+              "type": "comment",
+              "author": "b",
+              "text": "<p>Agreed.</p>",
+              "points": null,
+              "parent_id": 45100201,
+              "story_id": 45100002,
+              "children": []
+            }
+          ]
+        },
+        {
+          "id": 45100202,
+          "created_at": "2026-09-29T06:50:00.000Z",
+          "type": "comment",
+          "author": "c",
+          "text": "<p>Which CAT tool?</p>",
+          "points": null,
+          "parent_id": 45100101,
+          "story_id": 45100002,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 45100102,
+      "created_at": "2026-09-29T06:40:00.000Z",
+      "created_at_i": 1790664000,
+      "type": "comment",
+      "author": "notioner",
+      "text": "<p>We moved ours to a shared Notion table with one row per term and a column per client. It works, but nobody keeps it up to date.</p>",
+      "points": null,
+      "parent_id": 45100002,
+      "story_id": 45100002,
+      "children": [
+        {
+          "id": 45100203,
+          "created_at": "2026-09-29T07:10:00.000Z",
+          "type": "comment",
+          "author": "d",
+          "text": "<p>Same problem with Airtable.</p>",
+          "points": null,
+          "parent_id": 45100102,
+          "story_id": 45100002,
+          "children": []
+        }
+      ]
+    },
+    {
+      "id": 45100103,
+      "created_at": "2026-09-29T06:35:00.000Z",
+      "created_at_i": 1790663700,
+      "type": "comment",
+      "author": "e",
+      "text": "<p>+1</p>",
+      "points": null,
+      "parent_id": 45100002,
+      "story_id": 45100002,
+      "children": []
+    },
+    {
+      "id": 45100104,
+      "created_at": "2026-09-29T06:36:00.000Z",
+      "created_at_i": 1790663760,
+      "type": "comment",
+      "author": null,
+      "text": null,
+      "points": null,
+      "parent_id": 45100002,
+      "story_id": 45100002,
+      "children": []
+    }
+  ]
+}

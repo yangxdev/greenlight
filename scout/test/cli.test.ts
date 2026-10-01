@@ -85,7 +85,8 @@ describe('scout fetch', () => {
     // Every subreddit returns the same fixture here; duplicates collapse by id.
     expect(signals.filter((s) => s.source === 'reddit')).toHaveLength(2)
     expect(new Set(signals.map((s) => s.id)).size).toBe(signals.length)
-    expect(d.logs).toContain('hn: 3 signals')
+    // 3 stories plus 3 Ask HN replies from the item fixture.
+    expect(d.logs).toContain('hn: 6 signals')
   })
 
   it('upserts into the store when MONGODB_URI is set', async () => {
@@ -93,9 +94,9 @@ describe('scout fetch', () => {
     const d = deps({ env: { MONGODB_URI: 'mongodb+srv://x', MONGODB_DB: 'gl' }, openStore: mem.open })
     expect(await main(['fetch', '--sources', 'hn,github'], d)).toBe(0)
     expect(mem.opened).toEqual(['mongodb+srv://x#gl'])
-    expect(mem.rows.size).toBe(5)
+    expect(mem.rows.size).toBe(8)
     expect(mem.closedCount()).toBe(1)
-    expect(d.logs.at(-1)).toBe('MongoDB: 5 new, 0 updated (5 fetched)')
+    expect(d.logs.at(-1)).toBe('MongoDB: 8 new, 0 updated (8 fetched)')
   })
 
   it('widens the lookback window with --days', async () => {
@@ -122,7 +123,7 @@ describe('scout fetch', () => {
   it('writes a GitHub step summary when running in Actions', async () => {
     const summary = join(dir, 'summary.md')
     await main(['fetch', '--out', join(dir, 's.jsonl'), '--sources', 'hn'], deps({ env: { GITHUB_STEP_SUMMARY: summary } }))
-    expect(await readFile(summary, 'utf8')).toContain('| hn | ✅ | 3 |')
+    expect(await readFile(summary, 'utf8')).toContain('| hn | ✅ | 6 |')
   })
 
   it('refuses to run without a destination, and rejects unknown sources', async () => {
@@ -140,16 +141,16 @@ describe('scout export', () => {
     const out = join(dir, 'analyst.jsonl')
     await main(['fetch', '--out', raw, '--config', await redditReadyConfig()], deps({ env: REDDIT_ENV }))
     const d = deps()
-    expect(await main(['export', '--from', raw, '--out', out, '--limit', '5'], d)).toBe(0)
+    expect(await main(['export', '--from', raw, '--out', out, '--limit', '10'], d)).toBe(0)
 
     const ranked = await readJsonl<RankedSignal>(out)
-    expect(ranked).toHaveLength(5)
+    expect(ranked).toHaveLength(10)
     expect(ranked.map((s) => s.rank)).toEqual([...ranked.map((s) => s.rank)].sort((a, b) => b - a))
     expect(ranked.every((s) => typeof s.painScore === 'number' && Array.isArray(s.alsoSeenIn))).toBe(true)
     // The invoice tool was posted on HN and Reddit; it should come out as one merged signal.
     const invoice = ranked.find((s) => s.link === 'https://example.com/invoices')
     expect(invoice?.alsoSeenIn).toHaveLength(1)
-    expect(d.logs.at(-1)).toMatch(/^exported 5 of \d+ signals from the last 7 days/)
+    expect(d.logs.at(-1)).toMatch(/^exported 10 of \d+ signals from the last 7 days/)
   })
 
   it('reads from the store when no --from is given', async () => {
@@ -157,7 +158,10 @@ describe('scout export', () => {
     await main(['fetch', '--sources', 'hn'], deps({ env: { MONGODB_URI: 'mongodb://m' }, openStore: mem.open }))
     const out = join(dir, 'analyst.jsonl')
     expect(await main(['export', '--out', out], deps({ env: { MONGODB_URI: 'mongodb://m' }, openStore: mem.open }))).toBe(0)
-    expect(await readJsonl(out)).toHaveLength(3)
+    // 3 stories and the one reply with a pain phrase; the other two replies are dropped as noise.
+    const exported = await readJsonl<RankedSignal>(out)
+    expect(exported.map((s) => s.id).sort()).toEqual(['hn:45100001', 'hn:45100002', 'hn:45100004', 'hn:45100101'])
+    expect(exported.find((s) => s.id === 'hn:45100101')?.context).toBe('Ask HN: How do you handle client glossaries as a translator?')
   })
 
   it('validates its flags', async () => {
