@@ -98,6 +98,8 @@ jobs:
           cp -a template/. "$scaffold"
           cd "$scaffold"
           grep -rlI --exclude-dir=node_modules 'greenlight-product' . | xargs sed -i "s/greenlight-product/$NAME/g"
+          # The favicon is the product's initial on the vermilion square (repo names are [a-z0-9-], so this is safe).
+          sed -i "s|>g</text>|>${NAME:0:1}</text>|" public/favicon.svg
           git init -b main
           git add -A
           git commit -m "chore: scaffold from greenlight template" -m "Idea: $GITHUB_REPOSITORY#$ISSUE"

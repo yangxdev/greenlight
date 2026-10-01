@@ -48,6 +48,9 @@ Go through every item. Fix the blueprint when the fix is clear and stays within 
 9. **Compass.** No-go list (including the excluded business areas), budget (no paid APIs, no paid domains), stack,
    at most 3 screens. Personal data stays in the browser unless the core flow truly needs a server.
 10. **Concrete.** No "TBD", no placeholder copy, real field and route names.
+11. **Identity.** The Identity section has a 2–4 word lowercase tag, a real headline with at most one accent word, and
+    numbered sections with the tool as `01`. No task asks for a logo, icon set, illustration, custom colours or another
+    font: the template's "Look & feel" decides the look.
 
 ## Rules for edits
 

@@ -80,8 +80,10 @@ scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Excha
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
   CLAUDE.md                 stack conventions, Look & feel (house style), R2/Mongo usage, testing rules, definition of done
-  src/index.css             house-style tokens (yangxdev.com / waypoint family): colours, type, radius, shadows, motion
-  src/components/ui/        Button, IconButton, Field, EmptyState, Skeleton, DetailList, ThemeToggle + class strings
+  src/index.css             house-style tokens (yangxdev.com / sakana.ai family): colours, type, spacing, motion
+  scripts/check-style.ts    house-style guard in `npm run lint`: no rounded cards, shadows, gradients, blur or emoji
+  src/components/shell/     page structure: SiteHeader, Hero, Section (numbered rail), SiteFooter
+  src/components/ui/        Button, Segmented, RuledList, CellGrid, DetailList, Field, Note, Mark, ... + class strings
   src/ worker/ shared/      Vite + React + RTK + Tailwind + TS app, the /api Worker, shared types
   wrangler.jsonc            Cloudflare Worker with static assets (same shape as waypoint / yangxdev.com)
   .github/workflows/

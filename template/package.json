@@ -4,14 +4,14 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
     "dev": "vite",
     "dev:worker": "npm run build && npx wrangler dev",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
-    "lint": "eslint . --max-warnings 0 && prettier --check .",
+    "lint": "eslint . --max-warnings 0 && prettier --check . && node scripts/check-style.ts",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:watch": "vitest",

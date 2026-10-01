@@ -22,7 +22,10 @@ export function HealthBadge() {
     status === 'ok' ? 'API online' : status === 'error' ? 'API offline' : 'Checking API…';
 
   return (
-    <span role="status" className="inline-flex items-center gap-2 text-sm text-ink">
+    <span
+      role="status"
+      className="inline-flex items-center gap-2 font-mono text-label uppercase text-ink-soft"
+    >
       <span aria-hidden className={`size-2 rounded-full ${dot[status]}`} />
       {label}
     </span>

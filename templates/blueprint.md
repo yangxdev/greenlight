@@ -11,6 +11,14 @@
 
 What v1 does, in 3–6 bullets, from the user's point of view. Screens (max 3) and the core flow.
 
+## Identity
+
+How the product looks and introduces itself (see the template's CLAUDE.md → "Look & feel").
+- **Tag:** 2–4 lowercase words shown in mono next to the name, e.g. `privacy switch log`.
+- **Headline:** the hero's h1, real copy, with at most one word marked as the accent, e.g. `Switches worth *checking* again.`
+- **Sections:** the numbered sections in page order, each a one- or two-word rail label and what it holds, e.g.
+  `01 Checklist: the switches, filterable by platform`. The tool itself is `01`.
+
 ## Data model
 
 TypeScript interfaces for everything persisted, plus where it lives:

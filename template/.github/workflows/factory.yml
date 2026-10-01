@@ -155,6 +155,8 @@ jobs:
             You are the Greenlight Factory. Build this product from its blueprint.
 
             1. Read CLAUDE.md (conventions, definition of done) and blueprint.md (the spec). Both are authoritative.
+               Build the UI from src/components/shell and src/components/ui, following CLAUDE.md → "Look & feel" and the
+               blueprint's Identity: replace the scaffold's content in src/App.tsx, keep its structure.
             2. Implement the blueprint's tasks in order. For each task:
                - write the code and the tests that cover that task's acceptance criteria;
                - run `npm run check` and fix until it passes;

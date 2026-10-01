@@ -1,24 +1,21 @@
 import type { ReactNode } from 'react';
-import type { IconType } from 'react-icons';
-import { LuInbox } from 'react-icons/lu';
+import { labelClass } from './styles.ts';
 
 interface EmptyStateProps {
-  /** A Lucide icon from `react-icons/lu`. */
-  icon?: IconType;
   title: string;
   body?: string;
   /** Usually one Button: the thing to do first. */
   action?: ReactNode;
 }
 
-/** Subtle icon, one-line title, one-line explanation, one action. */
-export function EmptyState({ icon: Icon = LuInbox, title, body, action }: EmptyStateProps) {
+/** A ruled box with a one-line title, one line of explanation and one action. No illustration, no icon. */
+export function EmptyState({ title, body, action }: EmptyStateProps) {
   return (
-    <div className="rounded-md border border-line bg-surface px-6 py-14 text-center">
-      <Icon className="mx-auto size-8 text-subtle" aria-hidden />
-      <p className="mt-4 text-base font-medium text-ink">{title}</p>
-      {body ? <p className="mx-auto mt-1.5 max-w-md text-sm text-muted">{body}</p> : null}
-      {action ? <div className="mt-6 flex justify-center">{action}</div> : null}
+    <div className="border border-dashed border-line-strong px-6 py-12 sm:px-10">
+      <p className={labelClass}>Empty</p>
+      <p className="mt-3 text-h3 font-semibold text-ink">{title}</p>
+      {body ? <p className="mt-2 max-w-prose text-small text-muted">{body}</p> : null}
+      {action ? <div className="mt-6">{action}</div> : null}
     </div>
   );
 }

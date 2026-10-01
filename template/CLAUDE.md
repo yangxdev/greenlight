@@ -11,7 +11,7 @@ If you are the Factory, the blueprint decides *what* to build and this file deci
 | UI           | React 19 + Vite                                                          |
 | State        | Redux Toolkit (`createSlice`, `createAsyncThunk`, RTK Query if useful)   |
 | Styling      | Tailwind CSS v4 via `@tailwindcss/vite`, with the house-style tokens in `src/index.css` (see Look & feel) |
-| Fonts, icons | Geist + Geist Mono (`@fontsource-variable`), Lucide icons via `react-icons/lu` |
+| Fonts, icons | Geist + Geist Mono (`@fontsource-variable`), Lucide icons via `react-icons/lu` (controls only) |
 | Server code  | A Cloudflare Worker in `worker/`, serving `/api/*` on the same origin as the app |
 | Files        | Cloudflare R2 via the `BUCKET` binding                                   |
 | Database     | MongoDB Atlas free tier (M0) via the official `mongodb` driver. D1 is the fallback, see below |
@@ -33,9 +33,12 @@ src/
   index.css           # Tailwind import + @theme tokens (the only global CSS)
   app/store.ts        # makeStore(), RootState, AppDispatch (register slices in combineSlices)
   app/hooks.ts        # useAppDispatch / useAppSelector (always use these)
+  app/site.ts         # SITE_NAME, SITE_TAG: the product's identity
   features/<name>/    # one folder per feature: <name>Slice.ts, components, <name>.test.ts(x)
-  components/ui/      # house-style primitives: Button, IconButton, Field, EmptyState, Skeleton, DetailList,
-                      #   ThemeToggle, and styles.ts (buttonClass, cardClass, inputClass, labelClass, monoClass)
+  components/shell/   # page structure: SiteHeader, Hero (+ Accent), Section (numbered rail), SiteFooter
+  components/ui/      # house-style primitives: Button, IconButton, Checkbox, Field, Segmented, RuledList/RuledItem,
+                      #   CellGrid/Cell/Stat, DetailList, Note, EmptyState, Skeleton, Mark, ThemeToggle, and styles.ts
+                      #   (buttonClass, optionClass, labelClass, indexClass, chipClass, linkClass, monoClass, ...)
   components/         # other shared presentational components (no Redux inside)
   lib/                # framework-free helpers: api.ts fetch wrapper, theme.ts, cn.ts, formatting, ...
   test/               # setup.ts + renderWithStore helper
@@ -46,7 +49,8 @@ worker/
   env.ts              # Env interface: bindings + secrets
   routes/<name>.ts    # one handler module per resource, e.g. routes/items.ts
 wrangler.jsonc        # Worker name, assets, bindings (never secrets)
-public/               # static assets copied as-is
+public/               # static assets copied as-is (favicon.svg: the product's initial on vermilion)
+scripts/check-style.ts  # the house-style guard, run by `npm run lint`
 blueprint.md          # the spec (read-only for the Factory)
 build-report.md       # written by the Factory at the end of a build
 ```
@@ -65,53 +69,97 @@ build-report.md       # written by the Factory at the end of a build
 
 ## Look & feel
 
-Products look like siblings of the owner's own apps (yangxdev.com and waypoint): warm neutrals, hairlines, light first,
-one vermilion accent. The tokens in `src/index.css` and the primitives in `src/components/ui/` already encode this;
-build with them rather than around them.
+Products are siblings of the owner's own site, yangxdev.com, which takes its structure from sakana.ai: a page reads
+like a **ruled document** (the way Japanese corporate sites are laid out), not like a template. White first, hairlines, square corners, mono for every label,
+one vermilion accent, numbered sections with a left rail. The tokens in `src/index.css` and the components in
+`src/components/ui/` and `src/components/shell/` encode all of it; `App.tsx` in the scaffold shows the anatomy. Build
+with them rather than around them. `npm run lint` runs a style guard (`scripts/check-style.ts`) that fails on the hard
+rules below.
+
+**Why products used to look generated, and what replaces it**
+
+| The template look (don't)                                   | The house look (do)                                                      |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| A centred narrow column of rounded cards with soft shadows  | Full-width sections on one container, each with a numbered rail (`Section`) |
+| Cards stacked with gaps                                     | Rows separated by hairlines (`RuledList`), cells sharing borders (`CellGrid`) |
+| Sticky header with blur, product name in plain text         | Solid header: mark, lowercase name, mono tag, mono nav (`SiteHeader`)    |
+| Accent-coloured pill buttons, rounded filter chips          | One square ink button; filters as mono words over a rule (`Segmented`)   |
+| Small uppercase sans captions, `text-sm` everywhere          | Uppercase mono labels (`labelClass`), a real type scale (`text-display` … `text-label`) |
+| Icons in circles, emoji, gradients, illustrations           | Words and numbers (`01`, `Stat`); the small vermilion `Mark` is the logo |
+| Caveats in a banner                                         | Footnotes under the claim they qualify (`Note`)                          |
+| The Vite favicon                                            | The product's initial on vermilion (`public/favicon.svg`)                |
+
+**Anatomy of every product** (one screen or three, the same parts)
+
+1. `SiteHeader`: the mark, `SITE_NAME`, `SITE_TAG` in mono, optional mono nav (in-page anchors or the other screens).
+2. `Hero`: optional mono eyebrow, a `text-display` headline with at most one word in `Accent`, a one-sentence lede,
+   one `primary` action (plus at most one `ghost`), notes under it. For a tool whose job starts immediately, keep the
+   hero short and put the tool in the first section right under it, not behind a click.
+3. `Section`s numbered `01`, `02`, … in page order, each with a one- or two-word rail `label`. The tool itself is
+   section `01`. Alternate `tone="zone"` for a section that should stand apart, never two zones in a row.
+4. `SiteFooter`: mark, name, tag, a few mono links (source, "Suggest a change"), and `Note`s about the whole product
+   (what it stores, what it cannot do).
+
+**Identity** (the blueprint's "Identity" section decides it; set it in the first UI task)
+
+- `src/app/site.ts`: `SITE_NAME` (lowercase, it is the wordmark) and `SITE_TAG` (2–4 lowercase words, like
+  sakana.ai's "japan-vibes LLM"). `index.html`'s `<title>` is the name and the headline; the scaffold already put the
+  product's initial in `public/favicon.svg`.
+- The `Mark` and the lowercase name are the logo. Never draw an icon, a gradient blob or an illustration instead, and
+  never borrow yangxdev.com's personal branding (its kanji seal, Japanese glosses, vertical labels).
 
 **Principles**
 
 - **Light is the default** (even on a dark system); dark is one click away (`ThemeToggle`, remembered) and must look
   as good. Check every screen in both themes.
-- **One accent, 朱色 (`brand`), rationed**: the primary button, the focus ring, the selected state, the one notable
-  thing in a view. Never decoration, never a second accent. `danger` / `warning` / `success` are for status only.
-- **Separation by hairlines (`border-line`) and tone steps (`canvas` → `zone` → `surface` → `sunken`)**, not heavy
-  boxes. Cards use `cardClass`: a hairline and a barely visible lift.
-- **Geist for everything; Geist Mono (`monoClass`) only for what people transcribe**: codes, IDs, money, times.
-  No serif, no decorative fonts, no gradients, no glassmorphism, no emoji in the UI, no stock illustrations.
-- **Distinction comes from scale and tightness**: `text-display` titles, `font-semibold`, generous whitespace.
-- **Never hardcode a colour, shadow or duration.** Use tokens: `bg-surface`, `text-muted`, `border-line`,
-  `shadow-(--shadow-card)` (always this form; plain `shadow-card` freezes the light value), `duration-(--duration-hover)`,
-  `ease-out-soft`. If a colour sits ON another colour, it needs its own token (like `on-brand`); add it to `index.css` in
-  all three theme blocks.
-- **Motion**: only the three durations (120ms hover, 220ms panels, 320ms reveals) and the one curve. No bounce.
-  Everything collapses under `prefers-reduced-motion` (already global).
+- **One accent, 朱色 (`brand`), rationed to about eight appearances per scroll**: section indices and their short rule,
+  the `Mark`, the one `Accent` word, the selected option, the lit nav item, the focus outline. **Buttons are ink, not
+  brand.** Never decoration, never a second accent. `danger` / `warning` / `success` are for status only.
+- **Square corners everywhere.** Status dots are the only round element (`rounded-full`). There are no radius tokens:
+  `rounded-md` produces nothing and the style guard rejects it.
+- **No shadows.** Separate with hairlines (`border-line`) and tone (`canvas` → `zone`). Only a dialog or drawer gets
+  `shadow-(--shadow-panel)`.
+- **Geist for reading, Geist Mono for structure**: every label, index, nav item, tag, chip, date, count, code, path and
+  price is mono (`labelClass`, `indexClass`, `chipClass`, `monoClass`). Headings and body are Geist. No serif, no
+  decorative fonts.
+- **Type scale**: `text-display` (hero, once), `text-h2` (section titles), `text-h3` (row and cell titles),
+  `text-lede`, `text-body`, `text-small`, `text-note`, `text-label`. Generous line height; text never sits on a grey
+  card.
+- **Layout**: one container (`containerClass`, `max-w-measure` inside `px-gutter`) for header, hero, sections and
+  footer, so their left edges line up. Content is left-aligned; nothing is centred except inside a control.
+- **Never hardcode a colour, shadow or duration.** Use tokens: `bg-canvas`, `text-muted`, `border-line`,
+  `duration-(--duration-hover)`, `ease-out-soft`. Tailwind's stock palette is removed (`bg-white`, `text-gray-500`,
+  `bg-indigo-600` produce nothing). If a colour sits ON another colour it needs its own token (like `on-ink`); add it to
+  `index.css` in all three theme blocks.
+- **Motion**: only the three durations (120ms hover, 220ms panels, 320ms reveals) and the one curve. No bounce, no
+  spinners. Everything collapses under `prefers-reduced-motion` (already global).
+- **No emoji, no gradients, no blur, no stock illustrations, no icons as decoration.** Icons (Lucide via
+  `react-icons/lu`) are for controls only.
 
 **Components and interaction**
 
-- **One `primary` Button per view**; everything else `ghost`. Destructive actions use `danger` and confirm first.
-  Anything that navigates is an `<a>` styled with `buttonClass()`, never a button with an onClick.
-- Icon-only controls use `IconButton` with a `label`. Icons come from `react-icons/lu` (Lucide), `aria-hidden` when
-  decorative, `size-4` inline.
+- **One `primary` Button per view** (solid ink); everything else `ghost`. Destructive actions use `danger` and confirm
+  first. Anything that navigates is an `<a>` styled with `buttonClass()`, never a button with an onClick.
+- Lists of things (items, results, settings, steps): `RuledList` + `RuledItem`, with an index, date or category in the
+  mono `meta` column and one control in `aside`. Not cards.
+- Features, facts, prices: `CellGrid` with `Cell` (indexed `01`, `02`) or `Stat` (a big mono figure and a caption).
+- Label/value details: `DetailList` (ruled, the label column on the `zone` band; pass `onZone` inside a zone section).
+- Filters and tabs: `Segmented` (or `optionClass` for links). Tags: `chipClass`. Checkboxes: `Checkbox`.
+- Forms: `Field` (mono label above, hint below, error as `role="alert"`).
+- Empty states: `EmptyState` (a dashed ruled box, a title, one line, one action). Loading: `Skeleton` shaped like the
+  content.
+- Caveats, sources, "not verified yet": `Note` right under the thing it qualifies.
+- Icon-only controls use `IconButton` with a `label`, icons `aria-hidden`, `size-4`.
 - Touch targets: 36px under a mouse, 44px under a finger, via `pointer-coarse:` (already in the primitives). Never
   make that decision with a width breakpoint.
-- Forms: `Field` (label above, hint below, error as `role="alert"`). Captions and labels use `labelClass` (small
-  uppercase sans).
-- Details: `DetailList` for label/value rows with hairlines between them.
-- Empty states: `EmptyState` (subtle icon, one-line title, one-line body, one action). Loading: `Skeleton` shaped like
-  the content, not spinners.
-- Status dots are the only fully round element (`rounded-full`); everything else uses `rounded-md` (cards, inputs,
-  buttons) or `rounded-sm` (chips, badges).
-- Category colours are allowed only when scanning by type is a real task (like waypoint's flights vs hotels): one
-  family with the same lightness and chroma, evenly spaced hues, each ≥ 4.5:1 on `canvas`, never the danger hue.
-  Define them as tokens in `index.css`.
-- Mobile first: no horizontal scroll at 320px. Tabular numbers (`<time>` or `.tnum`) for anything that lines up.
-- **Single landing pages** may go further in yangxdev.com's direction: square corners, flat hairlines with no card
-  shadows, a hero up to 72px / 0.98 line-height / −0.035em (40px on mobile), two-digit section indices (`01`, `02`) in
-  small uppercase mono.
+- Category colours are allowed only when scanning by type is a real task: one family with the same lightness and
+  chroma, evenly spaced hues, each ≥ 4.5:1 on `canvas`, never the danger hue. Define them as tokens in `index.css`.
+- Mobile first: no horizontal scroll at 320px (the rail folds into one line above the content by itself). Tabular
+  numbers (`<time>` or `.tnum`) for anything that lines up.
 
-**Voice**: plain and specific. Sentence case, no exclamation marks, no marketing superlatives. Say what the thing does in
-one line.
+**Voice**: plain and specific, like sakana.ai's product pages. Sentence case, no exclamation marks, no marketing
+superlatives ("powerful", "seamless", "effortless", "unlock"). Say what the thing does in one line, then the facts.
+State limits plainly in notes.
 
 ## Server code: the Worker
 
@@ -210,10 +258,12 @@ binding (`d1_databases` in `wrangler.jsonc`), with plain SQL migrations in `migr
 
 A task is done when all of these hold:
 
-1. `npm run check` passes: ESLint (`--max-warnings 0`) + Prettier check, `vitest run`, `tsc -b && vite build`.
+1. `npm run check` passes: ESLint (`--max-warnings 0`) + Prettier check + the style guard, `vitest run`,
+   `tsc -b && vite build`.
    Run `npm run format` before committing.
 2. The task's acceptance criteria from `blueprint.md` are covered by tests.
 3. No `any`, no `// @ts-ignore`, no `eslint-disable` without a one-line reason. No hardcoded colours: tokens only.
+   The style guard passes without new `style-guard-ignore` comments unless the reason is real and written down.
 4. No new dependency that the blueprint or this file doesn't justify. `npm audit --audit-level=high` is clean.
 5. No secrets, tokens or connection strings in the diff.
 6. `GET /api/health` still returns `{ ok: true }` (the Publisher's smoke test depends on it).

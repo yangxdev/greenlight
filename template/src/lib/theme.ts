@@ -3,6 +3,7 @@ export type Theme = 'light' | 'dark';
 /** Same key as the boot script in index.html. */
 export const THEME_STORAGE_KEY = 'theme';
 
+// style-guard-ignore: <meta name="theme-color"> needs literal values, the canvas of each theme.
 const THEME_COLOR: Record<Theme, string> = { light: '#ffffff', dark: '#0f100f' };
 
 /**

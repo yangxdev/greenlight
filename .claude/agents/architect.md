@@ -38,7 +38,10 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
    (e.g. a nullable `verifiedOn`, never the build date) and list the checks under Setup notes.
 8. **Nothing breaks on the first change.** Derive counts and totals from the data instead of hard-coding them, and
    test rules rather than today's numbers.
-9. If the idea breaks the compass (no-go list, budget, stack), still write a blueprint for the closest compliant
+9. **Give it an identity.** Fill in the Identity section: a short mono tag, the real headline, and the numbered
+   sections. The look itself is fixed by the template; don't describe
+   colours, fonts or components, and don't ask for logos, icons or illustrations.
+10. If the idea breaks the compass (no-go list, budget, stack), still write a blueprint for the closest compliant
    version, and state the conflict in the first line under the title as `> ⚠️ Compass conflict: …`.
 
 Keep the blueprint under about 250 lines. The owner reviews it before anything is built.

@@ -37,13 +37,15 @@ Approved only when the product needs them (the blueprint says which and why):
 
 ## Look & feel
 
-Every product looks like a sibling of my own apps, yangxdev.com and waypoint: warm neutrals, hairline separation,
-light first (dark available and remembered), one vermilion accent (朱色) used sparingly, Geist type. The product
-template already implements this (tokens in `src/index.css`, primitives in `src/components/ui`, rules in `CLAUDE.md`),
-so blueprints should build with it, not restyle it.
+Every product looks like a sibling of my own site, yangxdev.com, which takes its structure from sakana.ai: warm
+neutrals, hairline separation, light first (dark available and remembered), one vermilion accent (朱色) used
+sparingly, Geist type. The product template already implements this (tokens in `src/index.css`, components in
+`src/components/ui` and `src/components/shell`, rules in `CLAUDE.md`), so blueprints should build with it, not
+restyle it.
 
-- **Tools over pages.** Most products are tools people *use*, so follow waypoint: dense, calm, softly rounded cards.
-  Only a single landing page may follow yangxdev.com: square corners, flat hairlines, a large tight headline.
+- **Pages read like documents, tools included.** Square corners, rows divided by hairlines instead of cards, numbered
+  sections with a left rail, uppercase mono labels, a solid ink primary button, a large tight headline. (Tools used to
+  follow waypoint's softly rounded cards; opt-out-log came out looking generated, so that rule is gone.)
 - **Restraint is the brand.** No gradients, glassmorphism, emoji, stock illustrations, serif or decorative fonts.
   Distinction comes from type scale, spacing and one accent.
 - **One primary action per screen.** If a screen needs two, it's two screens or the scope is wrong.
