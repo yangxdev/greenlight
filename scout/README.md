@@ -40,8 +40,10 @@ reads Reddit with approved credentials. Until then the source logs `reddit: skip
 3. In `config.json`, set `reddit.enabled` back to `true` and keep your username in `userAgent`. The source refuses to
    run while it says `CHANGE_ME`.
 
-The request (submitted 2026-09-30) declared the 10 subreddits now in `config.json`. Approval covers that use, so tell
-Reddit before adding subreddits.
+The request (submitted 2026-09-30) declared the 10 subreddits now in `config.json`. **Reddit denied it on 2026-10-01**
+("not in compliance with the Responsible Builder Policy and/or lacks necessary details"). The policy
+forbids submitting multiple requests for the same use case, and reading Reddit any other way after a refusal would be
+circumventing it, so the source stays disabled. The code is kept in case Reddit's policy changes.
 
 What the Scout does with Reddit, for the request and to stay inside it: once a day, one token request plus one
 `GET /r/<sub>/top?t=day&limit=50` per subreddit in `config.json`; no posting, voting or messaging. It stores no

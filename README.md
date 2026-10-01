@@ -249,7 +249,7 @@ Scout secrets (all optional; the Scout runs without them):
 | Secret | Value | Without it |
 |--------|-------|------------|
 | `MONGODB_URI` | Atlas connection string (see below) | signals go to a JSONL artifact on each run instead of MongoDB |
-| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | a **script** app at reddit.com/prefs/apps, which now needs Reddit's approval first ([how](scout/README.md#reddit-access)) | Reddit is skipped; the other sources still run |
+| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | a **script** app at reddit.com/prefs/apps, which needs Reddit's approval first. Greenlight's request was denied on 2026-10-01 ([details](scout/README.md#reddit-access)) | Reddit is skipped; the other sources still run |
 | `PRODUCTHUNT_TOKEN` | producthunt.com/v2/oauth/applications → developer token | public feed only, with no vote or comment counts |
 | `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs 2 |
 
