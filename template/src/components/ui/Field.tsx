@@ -28,12 +28,12 @@ export function Field({ label, hint, error, className, ...props }: FieldProps) {
         {...props}
       />
       {hint && !error ? (
-        <p id={`${id}-hint`} className="text-xs text-muted">
+        <p id={`${id}-hint`} className="text-note text-muted">
           {hint}
         </p>
       ) : null}
       {error ? (
-        <p id={`${id}-error`} role="alert" className="text-xs text-danger">
+        <p id={`${id}-error`} role="alert" className="text-note text-danger">
           {error}
         </p>
       ) : null}
