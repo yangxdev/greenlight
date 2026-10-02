@@ -51,6 +51,8 @@ worker/
 wrangler.jsonc        # Worker name, assets, bindings (never secrets)
 public/               # static assets copied as-is (favicon.svg: the product's initial on vermilion)
 scripts/check-style.ts  # the house-style guard, run by `npm run lint`
+README.md             # the repo's front page for visitors: you fill it in (see README below)
+docs/screenshots/     # screenshots of the live site, taken by the Publisher (don't edit)
 blueprint.md          # the spec (read-only for the Factory)
 build-report.md       # written by the Factory at the end of a build
 ```
@@ -161,6 +163,21 @@ rules below.
 **Voice**: plain and specific, like sakana.ai's product pages. Sentence case, no exclamation marks, no marketing
 superlatives ("powerful", "seamless", "effortless", "unlock"). Say what the thing does in one line, then the facts.
 State limits plainly in notes.
+
+## README
+
+The repo is public, and `README.md` is its front page: the first thing a visitor from a shared link or a search sees.
+The scaffold's README is a skeleton; fill in every bracketed line from `blueprint.md` and the finished product:
+
+- **The one-line description** under the title: the same sentence as `SITE_DESCRIPTION`.
+- **What it does**, **How to use it** (the real flow, with the labels the page uses), **Privacy** (exactly what is
+  stored and where; no claims the code doesn't back), **Contributing** (issues; for a data file, which file and what a
+  good entry looks like).
+- Keep **Run it locally** and **Built with** accurate if the build changed them (an R2 bucket, a MongoDB secret).
+- Keep the `<!-- greenlight:live -->` and `<!-- greenlight:screenshots -->` blocks empty and their markers intact: after
+  every deploy the Publisher writes the live link and screenshots of the live site (light and dark, desktop and phone)
+  into them, sets the repo's website and description, and commits the images to `docs/screenshots/`.
+- Same voice as the product: plain, specific, no badges wall, no emoji, no marketing superlatives.
 
 ## Server code: the Worker
 

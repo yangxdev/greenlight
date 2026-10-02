@@ -164,7 +164,9 @@ jobs:
             3. Stay inside the blueprint's scope and non-goals. Do not edit blueprint.md, CLAUDE.md or anything under .github/.
                Do not try to push, open PRs, or call external services. Tests must not need the network.
             4. If you run low on turns, commit the finished tasks first. A partial but green build beats a broken full one.
-            5. Finally, write build-report.md at the repo root by filling in every section of .github/build-report.md.
+            5. Fill in README.md (CLAUDE.md → "README"): every bracketed line, markers kept. Commit it:
+               `git add README.md && git commit -m "docs: readme"`.
+            6. Finally, write build-report.md at the repo root by filling in every section of .github/build-report.md.
                The greenlight issue is ${{ env.GREENLIGHT_REPO }}#${{ env.GREENLIGHT_ISSUE }} and the run is
                ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
                Then commit it: `git add build-report.md && git commit -m "docs: build report"`.

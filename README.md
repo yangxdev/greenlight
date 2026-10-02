@@ -79,7 +79,8 @@ reports/                    weekly reports (<week>.md) and verdicts (<week>.json
 scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Exchange, RSS fetchers + ranked export (see scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
-  CLAUDE.md                 stack conventions, Look & feel (house style), R2/Mongo usage, testing rules, definition of done
+  CLAUDE.md                 stack conventions, Look & feel (house style), README, R2/Mongo usage, testing rules, definition of done
+  README.md                 the product repo's front page: a skeleton the Factory fills; the Publisher adds link and screenshots
   src/index.css             house-style tokens (yangxdev.com / sakana.ai family): colours, type, spacing, motion
   scripts/check-style.ts    house-style guard in `npm run lint`: no rounded cards, shadows, gradients, blur or emoji
   src/components/shell/     page structure: SiteHeader, Hero, Section (numbered rail), SiteFooter
@@ -89,7 +90,7 @@ template/                   product skeleton copied into every new product repo
   .github/workflows/
     factory.yml             build from blueprint / fix from Inspector findings
     inspector.yml           checks + AI review on every PR, merge or send back
-    deploy.yml              Publisher: `wrangler deploy`, smoke test, "live"
+    deploy.yml              Publisher: `wrangler deploy`, smoke test, "live", repo website, README screenshots
   .github/build-report.md
 ```
 
@@ -146,7 +147,10 @@ snapshot.
      the AI review can't finish (e.g. usage limit), the issue becomes `stuck`.
 7. **Publisher** (`deploy.yml`, on push to `main`, no AI): builds the app (adding the Web Analytics beacon when the
    product has a `CF_BEACON_TOKEN` variable), runs `wrangler deploy` (Worker + static assets from `wrangler.jsonc`),
-   smoke-tests `https://<name>.<you>.workers.dev/api/health` and `/`, comments the live URL, and sets `live`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
+   smoke-tests `https://<name>.<you>.workers.dev/api/health` and `/`, comments the live URL, and sets `live`. Then it
+   makes the public repo presentable: it sets the repo's website and description (from the live page), photographs
+   the live site with the runner's Chrome (light and dark, desktop and phone, analytics beacon blocked), and writes the
+   live link and the screenshots into the README the Factory filled in, committed with `[skip ci]`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
    Cloudflare secrets are missing.
 8. **Observer**:
    - `uptime.yml` (every 6 hours, no AI) probes each `live` product's `/api/health` and `/` and stores the result in
@@ -196,7 +200,7 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 | Architect | `blueprint`, `review` (artifacts out: blueprint.md; JSON review out) | `scaffold`, `publish` |
 | Factory | `agent` (git bundle out), `verify` | `prepare`, `publish` |
 | Inspector | `checks`, `review` (JSON verdict out) | `decide` |
-| Publisher | `build` (dist/ out) | `gate`, `deploy` (`npm ci --ignore-scripts`, wrangler installed outside the repo), `report` |
+| Publisher | `build` (dist/ out), `screenshots` (PNGs out; playwright-core installed outside the repo) | `gate`, `deploy` (`npm ci --ignore-scripts`, wrangler installed outside the repo), `report`, `readme` (git, gh, curl, inline Python) |
 
 - Claude gets the job's short-lived, read-only `GITHUB_TOKEN`. Pushes use the PAT with `core.hooksPath=/dev/null`.
 - Gate labels only trigger when you apply them (`github.actor == github.repository_owner`).
