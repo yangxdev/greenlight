@@ -4,12 +4,10 @@ A personal pipeline that turns internet signals into small shipped web products,
 on €0 beyond a Claude Pro plan. Everything runs on personal accounts using only free tiers: GitHub
 (Issues, Projects, Actions), Cloudflare Workers/R2/Web Analytics, and MongoDB Atlas M0.
 
-```
- Scout ──► Analyst ──► Critic ──► Board ──► Architect ──► Reviewer ──► Factory ──► Inspector ──► Publisher ──► Observer
- (scripts)   (AI)       (AI)     (issues)     (AI)          (AI)         (AI)      (AI+checks)    (no AI)        (AI)
-                                    ▲    human gates:  approved                   blueprint-ok                   │
-                                    └──────────────────────────── weekly-report.md ◄─────────────────────────────┘
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/pipeline-dark.svg">
+  <img src="assets/diagrams/pipeline-light.svg" width="960" alt="The pipeline in ten numbered stages: 01 Scout (scripts), 02 Analyst, 03 Critic, 04 Board (issues), 05 Architect, 06 Reviewer, 07 Factory, 08 Inspector (AI plus checks), 09 Publisher (no AI), 10 Observer. You add approved between Board and Architect, and blueprint-ok between Reviewer and Factory. The Observer's weekly-report.md feeds back into the Board.">
+</picture>
 
 Its first product, [opt-out-log](https://github.com/yangxdev/opt-out-log), went from idea card to live site through
 the whole pipeline.
@@ -31,18 +29,12 @@ The Analyst, Critic and Architect read it.
 
 ## Label state machine
 
-Each idea issue carries exactly one state label. Two transitions are human gates (🧑).
+Each idea issue carries exactly one state label. Two transitions are human gates: you add `approved` and `blueprint-ok`.
 
-```
-idea ──🧑──► approved ──Architect──► blueprint-ready ──🧑──► blueprint-ok ──dispatch──► building
-                                                                                          │
-      Factory PR ──► Inspector ──pass──► merge ──► Publisher (deploy + smoke test) ──► live
-                        │  ▲
-                   fail │  │ fix push (max 3 rounds)
-                        ▼  │
-                      Factory fix ── rounds exhausted / any automated step fails ──► stuck
-any state ──🧑──► archived
-```
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/diagrams/states-dark.svg">
+  <img src="assets/diagrams/states-light.svg" width="960" alt="The label states in order: idea, approved (you), blueprint-ready (Architect), blueprint-ok (you), building (dispatch). While building, the Factory opens a PR, the Inspector reviews it and runs the checks, and on a pass it merges and the Publisher deploys and smoke-tests, which sets live. On a fail the Factory pushes a fix, at most three rounds; then, or when any automated step fails, the issue is stuck. You can move any state to archived.">
+</picture>
 
 | Label | Set by | Meaning / what happens next |
 |-------|--------|-----------------------------|
@@ -64,6 +56,7 @@ To regenerate a blueprint, comment your feedback on the issue (your comments are
 ```
 compass.md                  your interests, stack, no-go list, definition of "good"
 DESIGN.md                   the design language: tokens, type, layout, registers, image style, mascot brief
+assets/diagrams/            README diagrams (light + dark SVG), drawn by build.py from the DESIGN.md tokens
 templates/                  idea.md, blueprint.md, weekly-report.md (handoff formats)
 .claude/agents/             analyst.md, critic.md, architect.md, blueprint-reviewer.md, observer.md (role prompts)
 .github/ISSUE_TEMPLATE/     idea.yml (hand-write ideas)

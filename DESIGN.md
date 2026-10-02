@@ -130,26 +130,52 @@ Rules for diagrams that replace README graphs:
   from these tokens outright. A diagram with a wrong word is worse than the ASCII it replaces.
 - **Read left to right, numbered.** Steps carry `01`, `02`… in mono; arrows are plain hairlines with a small
   open arrowhead. Human gates are the accent; everything else is ink.
-- **Two files per image, light and dark**, linked with GitHub's `#gh-light-mode-only` / `#gh-dark-mode-only`.
-  Export at 2× (a 1280px-wide README image is 2560px). Social previews: 1280×640.
+- **Two files per image, light and dark**, linked with `<picture>` and a `prefers-color-scheme: dark` source.
+  Diagrams are SVG with text as outlines; the README's are drawn by `assets/diagrams/build.py` from these tokens, so
+  edit labels there. Raster images export at 2× (a 1280px-wide README image is 2560px). Social previews: 1280×640.
 - **Alt text says what the diagram says**, not "diagram".
 
 ## Mascot brief
 
-For greenlight. One character, used on the README, the dashboard's empty states and social previews. Never inside a
-product's interface.
+For greenlight. **The ant**: a colony of single-purpose workers that together build more than any one of them could
+is what the pipeline is. One character, used on the README hero, the dashboard's empty states and social previews.
+Never inside a product's interface, never inside a diagram (diagrams are words and numbers).
 
-- **Concept: the signal lamp.** A small upright rectangular housing in ink, square corners, hairline outline, with a
-  single round lens: the system's one permitted circle, like the status dots. The lens is **vermilion** while it waits
-  for a human (the gates) and **green** when something ships. It is the pipeline's personality: patient, precise, it
-  waits for your go.
-- **Built from the system:** rectangles, straight lines, one circle. Flat fills from the palette above, no gradients
-  or shading. A face is optional and minimal (two small dots, no mouth, or none at all).
-- **Must work at 16px** (as a favicon, it reduces to the housing and the lens) and as a single-colour line drawing.
-- **Poses, not expressions:** waiting (vermilion lens), building (lens off, a small mono `…`), live (green lens),
-  stuck (danger lens, tilted slightly). One pose per image.
-- **Never:** cute-sticker proportions, big eyes, gloss, outlines in a second accent, a robot, a traffic light with
-  three lamps, or anything from yangxdev.com's personal layer (seal, kanji).
+- **The character:** a flat ink silhouette (`ink`, so near-white on dark), no outline in another colour. Head, thorax
+  and abdomen read as three clear masses; legs and antennae are thin and straight. Eyes are two small dots or none.
+- **Props** are palette greys (`zone`, `line-strong`) drawn with hairlines: a newspaper, a pen, a blueprint, blocks.
+- **One accent per image, on the work, not the ant:** the signal circled in the newspaper, the one room marked on the
+  blueprint. Status green only in the `live` pose.
+- **Poses, one per image.** Stages: *scout* (magnifier over a newspaper, one item circled), *write* (a pen taller than
+  itself, for the Analyst and Critic), *architect* (set square on a blueprint), *build* (carrying a block to a stack).
+  States: *waiting* (beside a small signal lamp, its round lens vermilion), *live* (lens green), *stuck* (lens in
+  `danger`, the ant looking at it).
+- **Must work at 16px** (the favicon is the head and antennae) and as a single-colour silhouette.
+- **Never:** big white cartoon eyes, a mouth or expressions, cute-sticker proportions, gloss or shading, a second
+  accent, a robot, or anything from yangxdev.com's personal layer (seal, kanji).
+
+### Making the images
+
+1. **Generate a character sheet, not single images.** One prompt, one wide canvas, four poses in equal panels
+   separated by thin grey hairlines. Poses generated one at a time drift; poses from one generation stay one ant.
+2. **Cut the panels** at the hairlines (equal widths make it a plain crop).
+3. **Vectorise each pose** (Illustrator Image Trace, Inkscape Trace Bitmap or `vtracer`) into flat fills, snap the
+   colours to the exact hex values above, and fix the eyes and stray shapes by hand.
+4. **Save `assets/mascot/<pose>.svg` and `<pose>-dark.svg`** (ink becomes `#F7F6F3`, the accent `#FF9B50`). Never ship
+   the raster: a white-background PNG is a white box in GitHub's dark mode.
+5. **Set any words afterwards** in Geist (hero headline, social preview), never in the generator.
+
+Prompt for the sheet, followed by the style block above:
+
+```text
+A character sheet of one ant mascot: four equal panels side by side, separated by thin grey vertical hairlines,
+the same ant in every panel. The ant is a flat solid near-black silhouette with three clear body segments, thin
+straight legs and antennae, two very small dot eyes, no mouth. Panel 1: holding a magnifier over an open newspaper,
+one headline circled in vermilion. Panel 2: writing with a pen taller than itself on a sheet of paper. Panel 3:
+holding a set square, standing on a rolled-out blueprint with one room outlined in vermilion. Panel 4: carrying a
+plain block towards a small stack of blocks. Props in light greys with hairline outlines. Nothing crosses a panel
+edge. No text anywhere.
+```
 
 ---
 
