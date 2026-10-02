@@ -320,8 +320,9 @@ Actions → **Setup labels** → *Run workflow*. It's safe to re-run.
 6. Let `board-sync.yml` move the cards. Labels are the source of truth because the workflows read and write them;
    the board's Status only mirrors them, and nothing in GitHub does that on its own.
    - GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)** → Generate new token,
-     with only the **project** scope. A classic token is needed because fine-grained tokens can't reach a project
-     owned by a personal account. Save it as the repository secret `PROJECT_TOKEN`.
+     with the **project** scope, plus **repo** if your greenlight repo is private (without it the token can't read
+     the issues on the board). A classic token is needed because fine-grained tokens can't reach a project owned by a
+     personal account. Save it as the repository secret `PROJECT_TOKEN`.
    - Set the repository variable `GREENLIGHT_PROJECT` to the board's number (the `N` in
      `github.com/users/<you>/projects/N`).
    - Actions → **Board sync** → *Run workflow* once. After that it runs on every label change and after Ideas, the

@@ -5,8 +5,9 @@
 # workflow's own GITHUB_TOKEN (Ideas filing an idea, the Architect setting blueprint-ready) trigger no issue events,
 # so the runs of those workflows trigger a sync too.
 #
-# Needs the PROJECT_TOKEN secret (a classic token with only the `project` scope: fine-grained tokens can't reach a
-# project owned by a personal account) and the GREENLIGHT_PROJECT variable (the board's number, from its URL).
+# Needs the PROJECT_TOKEN secret (a classic token with the `project` scope, plus `repo` while this repository is
+# private: fine-grained tokens can't reach a project owned by a personal account) and the GREENLIGHT_PROJECT variable
+# (the board's number, from its URL).
 # Without either, it does nothing.
 name: Board sync
 
@@ -72,7 +73,8 @@ jobs:
           options = {o["name"]: o["id"] for o in project["field"]["options"]}
           if any(item["content"] is None for item in project["items"]["nodes"]):
               sys.exit("::error::PROJECT_TOKEN can see the board but not the issues on it, so it can't read this "
-                       "repository. Use a classic token with the project scope (README, Project board setup).")
+                       "repository. A private repository needs the repo scope next to project (README, Project board "
+                       "setup).")
           on_board = {
               item["content"]["number"]: item
               for item in project["items"]["nodes"]
