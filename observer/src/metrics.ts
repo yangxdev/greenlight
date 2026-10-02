@@ -4,6 +4,7 @@ import { probe } from './probe.ts'
 import { discoverProducts } from './products.ts'
 import type { ProbeStore } from './store.ts'
 import type { BoardMetrics, Ctx, Metrics, ObserverConfig, Product, ProductMetrics } from './types.ts'
+import { checkTokens } from './tokens.ts'
 import { reportWindow, type ReportWindow } from './week.ts'
 
 export const STATE_LABELS = ['idea', 'approved', 'blueprint-ready', 'blueprint-ok', 'building', 'live', 'stuck', 'archived']
@@ -50,10 +51,13 @@ export async function buildMetrics({ ctx, config, greenlightRepo, store }: Metri
   const window = reportWindow(ctx.now)
   const notes: string[] = []
 
-  const [products, issues] = await Promise.all([
+  const [products, issues, tokenCheck] = await Promise.all([
     discoverProducts(ctx, greenlightRepo),
     ghList<GhIssue>(ctx, `/repos/${greenlightRepo}/issues?state=all`),
+    checkTokens(ctx),
   ])
+  // Expiring credentials first: they break the whole pipeline, not one product.
+  notes.push(...tokenCheck.notes)
 
   if (!store) notes.push('No MONGODB_URI: uptime is a single check at report time, not a 7-day history.')
 
@@ -80,6 +84,7 @@ export async function buildMetrics({ ctx, config, greenlightRepo, store }: Metri
     window: { start: window.start.toISOString(), end: window.end.toISOString() },
     products: productMetrics,
     board: boardMetrics(issues, window),
+    tokens: tokenCheck.tokens,
     notes,
   }
 }

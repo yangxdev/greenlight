@@ -64,6 +64,7 @@ export function world(options: { healthy?: boolean } = {}): (url: URL, init?: Re
       if (url.pathname === '/') return new Response('<html></html>', { status: healthy ? 200 : 502 })
     }
     if (url.hostname === 'api.cloudflare.com') {
+      if (url.pathname === '/client/v4/user/tokens/verify') return json({ success: true, result: { id: 't', status: 'active' } })
       if (url.pathname.endsWith('/rum/site_info/list')) {
         return json({ success: true, result: [{ site_tag: SITE_TAG, host: 'invoice-nudge.pages.dev', ruleset: null }] })
       }

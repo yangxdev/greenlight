@@ -62,12 +62,25 @@ export interface BoardMetrics {
   ideasFiledThisWeek: number
 }
 
+/** A long-lived credential the pipeline depends on, and when it stops working. */
+export interface TokenExpiry {
+  name: 'GREENLIGHT_TOKEN' | 'CLOUDFLARE_API_TOKEN' | 'CLAUDE_CODE_OAUTH_TOKEN'
+  /** YYYY-MM-DD */
+  expiresOn: string
+  /** Whole days from the report's generation; negative once expired. */
+  daysLeft: number
+  /** What to do, in one sentence. */
+  renew: string
+}
+
 export interface Metrics {
   generatedAt: string
   week: string
   window: { start: string; end: string }
   products: ProductMetrics[]
   board: BoardMetrics
+  /** Tokens with a known expiry. Ones within 30 days also get a note. */
+  tokens: TokenExpiry[]
   /** Data gaps the report must mention instead of guessing (missing secrets, failed APIs). */
   notes: string[]
 }

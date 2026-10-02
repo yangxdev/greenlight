@@ -30,6 +30,7 @@ Writes `metrics.json` for the last complete ISO week:
 | `traffic` | Cloudflare Web Analytics (GraphQL `rumPageloadEventsAdaptiveGroups`), this week vs last | no Cloudflare secrets, or no Web Analytics site/beacon for the product: `null` |
 | `successMetric` | the product's `blueprint.md` "Success metric" section | the token can't read the product repo: `null` |
 | `board` | open issues per state label, stuck issues, ideas filed this week | none |
+| `tokens` | expiry of `GREENLIGHT_TOKEN` (GitHub's `github-authentication-token-expiration` header), the Cloudflare token (`tokens/verify`) and the Claude token (the `CLAUDE_TOKEN_EXPIRES` variable) | the token isn't set, or it never expires: left out. Within 30 days, or a Cloudflare token that isn't active: also a note |
 
 Every gap is written to `notes[]`, and the report must repeat them rather than guess.
 
