@@ -156,7 +156,7 @@ snapshot.
    product has a `CF_BEACON_TOKEN` variable), runs `wrangler deploy` (Worker + static assets from `wrangler.jsonc`),
    smoke-tests `https://<name>.<you>.workers.dev/api/health` and `/`, comments the live URL, and sets `live`. Then it
    makes the public repo presentable: it sets the repo's website and description (from the live page), photographs
-   the live site with the runner's Chrome (light and dark, desktop and phone, analytics beacon blocked), and writes the
+   the live site with the runner's Chrome (light theme, desktop and phone, analytics beacon blocked), and writes the
    live link and the screenshots into the README the Factory filled in, committed with `[skip ci]`. Pushes before the product is built (scaffold, blueprint) are skipped, and so is everything if the
    Cloudflare secrets are missing.
 8. **Observer**:

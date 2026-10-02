@@ -7,7 +7,7 @@
 #   deploy  (Cloudflare token)    never runs repository code: `npm ci --ignore-scripts` (so wrangler can bundle
 #                                 the Worker's dependencies) + a pinned wrangler installed outside the repo
 #   report  (PAT)                 comments the live URL and labels "live", or "stuck" on failure
-#   screenshots (no secrets)      the runner's Chrome photographs the live site (light/dark, desktop/phone)
+#   screenshots (no secrets)      the runner's Chrome photographs the live site (light theme, desktop/phone)
 #   readme  (PAT)                 sets the repo's About (website, description) and refreshes the README's live link
 #                                 and screenshots, committed with [skip ci] so it doesn't deploy again
 name: Publisher
@@ -260,8 +260,10 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p docs/screenshots
+          # Screenshots are light only; drop dark ones an older Publisher committed.
+          git rm -q --ignore-unmatch docs/screenshots/desktop-dark.png docs/screenshots/section-dark.png docs/screenshots/mobile-dark.png
           # Only our own file names, and only real PNGs of a sane size.
-          for name in desktop-light desktop-dark section-light section-dark mobile-light mobile-dark; do
+          for name in desktop-light section-light mobile-light; do
             f="$SHOTS/$name.png"
             [ -f "$f" ] || continue
             if [ "$(head -c 8 "$f" | od -An -tx1 | tr -d ' \n')" = "89504e470d0a1a0a" ] && [ "$(stat -c %s "$f")" -lt 3000000 ]; then
@@ -280,8 +282,7 @@ jobs:
               if not have(f"{base}-light"):
                   return ""
               w = f' width="{width}"' if width else ""
-              dark = f'\n  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/{base}-dark.png">' if have(f"{base}-dark") else ""
-              return f'<picture>{dark}\n  <img alt="{alt}" src="docs/screenshots/{base}-light.png"{w}>\n</picture>'
+              return f'<img alt="{alt}" src="docs/screenshots/{base}-light.png"{w}>'
 
           blocks = {
               "live": f"**[Open {name} → {host}]({url})**",
@@ -291,7 +292,7 @@ jobs:
                       picture("desktop", f"{name}, first screen on a desktop browser"),
                       picture("section", f"{name}, the main view"),
                       (lambda p: f'<p align="center">\n{p}\n</p>' if p else "")(picture("mobile", f"{name} on a phone", 320)),
-                      "<sub>Screenshots of the live site, refreshed on every deploy. They follow your GitHub theme.</sub>"
+                      "<sub>Screenshots of the live site, refreshed on every deploy.</sub>"
                       if have("desktop-light") else "",
                   ]
                   if part

@@ -175,7 +175,7 @@ The scaffold's README is a skeleton; fill in every bracketed line from `blueprin
   good entry looks like).
 - Keep **Run it locally** and **Built with** accurate if the build changed them (an R2 bucket, a MongoDB secret).
 - Keep the `<!-- greenlight:live -->` and `<!-- greenlight:screenshots -->` blocks empty and their markers intact: after
-  every deploy the Publisher writes the live link and screenshots of the live site (light and dark, desktop and phone)
+  every deploy the Publisher writes the live link and screenshots of the live site (light theme, desktop and phone)
   into them, sets the repo's website and description, and commits the images to `docs/screenshots/`.
 - Same voice as the product: plain, specific, no badges wall, no emoji, no marketing superlatives.
 

@@ -17,12 +17,11 @@ if (!url || !/^https?:\/\//.test(url) || !outDir) {
 const require = createRequire(join(process.env.PLAYWRIGHT_DIR ?? process.cwd(), 'noop.js'));
 const { chromium } = require('playwright-core');
 
-// What a visitor sees first, plus (desktop) the first numbered section. Phones at 2x so text stays sharp.
+// What a visitor sees first, plus (desktop) the first numbered section, in the light theme the site opens in.
+// Phones at 2x so text stays sharp.
 const VIEWS = [
   { name: 'desktop-light', theme: 'light', viewport: { width: 1440, height: 960 }, scale: 1, mobile: false },
-  { name: 'desktop-dark', theme: 'dark', viewport: { width: 1440, height: 960 }, scale: 1, mobile: false },
   { name: 'mobile-light', theme: 'light', viewport: { width: 390, height: 844 }, scale: 2, mobile: true },
-  { name: 'mobile-dark', theme: 'dark', viewport: { width: 390, height: 844 }, scale: 2, mobile: true },
 ];
 
 await mkdir(outDir, { recursive: true });
