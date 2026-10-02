@@ -167,11 +167,13 @@ jobs:
           [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ] || { echo "No greenlight issue to report to"; exit 0; }
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           if [ "$RESULT" = "success" ]; then
-            # Redeploys of an already-live product stay quiet.
+            # Redeploys of an already-live product stay quiet, but clear the stuck a failed redeploy left.
             if ! grep -qE '(^|,)live(,|$)' <<<"$STATE"; then
               gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
                 --body "🚀 **Publisher:** live at ${URL} (smoke test passed on \`/api/health\`). Commit \`${GITHUB_SHA:0:7}\`, run: ${run_url}"$'\n\n'"<!-- greenlight:url=${URL} -->"
               gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label live --remove-label building --remove-label stuck
+            elif grep -qE '(^|,)stuck(,|$)' <<<"$STATE"; then
+              gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --remove-label stuck
             fi
           else
             gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
