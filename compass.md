@@ -6,7 +6,7 @@ The agents treat every line here as a hard constraint unless it says "prefer".
 ## Who I am
 
 - Solo developer, building evenings/weekends. Personal accounts only.
-- <!-- TODO: one line about your background / what you know better than most people -->
+- Full-stack software engineer: React and TypeScript on the front, AWS serverless and Python on the back.
 
 ## Interests (build things near these)
 

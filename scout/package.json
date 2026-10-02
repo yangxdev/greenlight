@@ -1,6 +1,7 @@
 {
   "name": "greenlight-scout",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "description": "Greenlight Scout: pulls free internet signals into MongoDB. No AI.",
   "type": "module",

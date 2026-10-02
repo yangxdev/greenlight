@@ -1,6 +1,7 @@
 {
   "name": "greenlight-observer",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "description": "Greenlight Observer data scripts: uptime probes and weekly metrics. No AI.",
   "type": "module",

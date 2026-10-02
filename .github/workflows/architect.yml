@@ -100,6 +100,8 @@ jobs:
           grep -rlI --exclude-dir=node_modules 'greenlight-product' . | xargs sed -i "s/greenlight-product/$NAME/g"
           # The README credits the repo's owner (owner names are [A-Za-z0-9-], so this is safe).
           grep -rlI --exclude-dir=node_modules 'greenlight-owner' . | xargs -r sed -i "s/greenlight-owner/${FULL%%/*}/g"
+          # The MIT licence is dated the year the product is created.
+          sed -i "s/greenlight-year/$(date -u +%Y)/" LICENSE.md
           # The favicon is the product's initial on the vermilion square (repo names are [a-z0-9-], so this is safe).
           sed -i "s|>g</text>|>${NAME:0:1}</text>|" public/favicon.svg
           git init -b main

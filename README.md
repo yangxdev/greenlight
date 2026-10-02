@@ -11,6 +11,9 @@ on €0 beyond a Claude Pro plan. Everything runs on personal accounts using onl
                                     └──────────────────────────── weekly-report.md ◄─────────────────────────────┘
 ```
 
+Its first product, [opt-out-log](https://github.com/yangxdev/opt-out-log), went from idea card to live site through
+the whole pipeline.
+
 Stages hand off through **markdown files and labels, not chat**: idea cards (`templates/idea.md`), blueprints
 (`templates/blueprint.md`), build reports (`template/.github/build-report.md`) and weekly reports
 (`templates/weekly-report.md`). `compass.md` holds interests, stack, no-go list and the meaning of "good".
@@ -184,7 +187,7 @@ The Pro plan's usage limits are the real budget:
 - **No AI in deterministic steps.** Repo creation, secrets, validation, checks, pushes, PRs and labels are all shell.
 - **GitHub Actions minutes:** public repos are unlimited; private repos share 2,000 free minutes a month, and a Factory
   run can take up to 90. That is why product repos are public by default (`PRODUCT_VISIBILITY`); secrets stay secret
-  either way, and `greenlight` itself stays private. Pull requests from forks only get the deterministic checks: the
+  either way. Pull requests from forks only get the deterministic checks: the
   Inspector's AI review, merge and fix loop run for the repo's own `factory/*` branches only.
 
 ### Security model
@@ -328,6 +331,11 @@ All nine actors exist. The next steps depend on running them for real:
 - Key-action tracking: the Observer reports "no data" for each product's key action until products emit a counted event
   (for example a tiny `/api/event` Function writing to MongoDB).
 - Optional: sync Project board Status from labels (needs a token with Projects access).
+
+## License
+
+[MIT](LICENSE.md). Every product repo gets its own MIT `LICENSE.md` from `template/`, in the name of the account that
+owns it and dated the year it was created.
 
 ## Local development of the template
 

@@ -51,4 +51,4 @@ React 19, Vite, Redux Toolkit and Tailwind CSS v4, served by a Cloudflare Worker
 
 ---
 
-Made by [greenlight-owner](https://github.com/greenlight-owner).
+Made by [greenlight-owner](https://github.com/greenlight-owner). [MIT licensed](LICENSE.md).
