@@ -7,7 +7,7 @@ on €0 beyond a Claude Pro plan. Everything runs on personal accounts using onl
 <img src="assets/diagrams/pipeline-light.svg" width="960" alt="The pipeline in ten numbered stages: 01 Scout (scripts), 02 Analyst, 03 Critic, 04 Board (issues), 05 Architect, 06 Reviewer, 07 Factory, 08 Inspector (AI plus checks), 09 Publisher (no AI), 10 Observer. You add approved between Board and Architect, and blueprint-ok between Reviewer and Factory. The Observer's weekly-report.md feeds back into the Board.">
 
 Its first product, [opt-out-log](https://github.com/yangxdev/opt-out-log), went from idea card to live site through
-the whole pipeline.
+the whole pipeline: 16 minutes of machine time, 73 minutes in all ([first run](#first-run)).
 
 Stages hand off through **markdown files and labels, not chat**: idea cards (`templates/idea.md`), blueprints
 (`templates/blueprint.md`), build reports (`template/.github/build-report.md`) and weekly reports
@@ -23,6 +23,25 @@ The Analyst, Critic and Architect read it.
 | 3 | Scout | **built** (daily fetch + ranked export) |
 | 3 | Analyst, Critic | **built** (weekly `ideas.yml`) |
 | 4 | Observer | **built** (6-hourly uptime probes + weekly `observer.yml`) |
+
+## First run
+
+opt-out-log on 30 September 2026, from the Analyst starting on stored signals to the site answering its health check.
+Times come from the workflow runs and the bot comments on [issue #1](https://github.com/yangxdev/greenlight/issues/1).
+
+| Step | Started (UTC) | Took |
+|------|---------------|------|
+| Analyst + Critic: signals to an `idea` issue | 14:28 | 3 min 28 s |
+| Architect + Reviewer: `approved` to a reviewed blueprint | 15:08 | 3 min 1 s |
+| Factory: `blueprint-ok` to a pull request | 15:31 | 6 min 45 s |
+| Inspector: review, checks and merge | 15:38 | 1 min 22 s |
+| Publisher: deploy and smoke test | 15:39 | 1 min 2 s |
+| **Machine time** | | **15 min 38 s** |
+| **Idea to live, wall clock** | 14:28 → 15:40 | **1 h 12 min 36 s** |
+
+The rest of the wall clock is the two human gates: reading the idea and the blueprint. On this first run it also
+includes adding the Blueprint Reviewer and running the Architect again. From `blueprint-ok` to live took 9 minutes.
+The Scout's daily fetch happens beforehand and isn't counted.
 
 ## Label state machine
 
