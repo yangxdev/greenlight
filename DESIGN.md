@@ -130,8 +130,8 @@ Rules for diagrams that replace README graphs:
   from these tokens outright. A diagram with a wrong word is worse than the ASCII it replaces.
 - **Read left to right, numbered.** Steps carry `01`, `02`… in mono; arrows are plain hairlines with a small
   open arrowhead. Human gates are the accent; everything else is ink.
-- **Two files per image, light and dark**, linked with `<picture>` and a `prefers-color-scheme: dark` source.
-  Diagrams are SVG with text as outlines; the README's are drawn by `assets/diagrams/build.py` from these tokens, so
+- **Two files per image, light and dark**, linked with `<picture>` and a `prefers-color-scheme: dark` source. The
+  exception is greenlight's README, which shows the light diagrams in both themes, as white sheets. Diagrams are SVG with text as outlines; the README's are drawn by `assets/diagrams/build.py` from these tokens, so
   edit labels there. Raster images export at 2× (a 1280px-wide README image is 2560px). Social previews: 1280×640.
 - **Alt text says what the diagram says**, not "diagram".
 
