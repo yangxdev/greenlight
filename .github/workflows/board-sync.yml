@@ -50,7 +50,10 @@ jobs:
               args = ["gh", "api", "graphql", "-f", f"query={query}"]
               for key, value in variables.items():
                   args += ["-F" if isinstance(value, int) else "-f", f"{key}={value}"]
-              return json.loads(subprocess.run(args, check=True, capture_output=True, text=True).stdout)["data"]
+              done = subprocess.run(args, capture_output=True, text=True)
+              if done.returncode != 0:
+                  sys.exit(f"::error::GitHub GraphQL: {(done.stderr or done.stdout).strip()}")
+              return json.loads(done.stdout)["data"]
 
           project = graphql("""
             query($owner: String!, $number: Int!) {
@@ -92,12 +95,12 @@ jobs:
               if item is None:
                   if issue["state"] == "CLOSED":
                       continue
+                  print(f"#{issue['number']}: not on the board, adding it")
                   item = {"id": graphql("""
                     mutation($project: ID!, $content: ID!) {
                       addProjectV2ItemById(input: {projectId: $project, contentId: $content}) { item { id } }
                     }""", project=project["id"], content=issue["id"])["addProjectV2ItemById"]["item"]["id"],
                     "status": None}
-                  print(f"#{issue['number']}: added to the board")
               if (item.get("status") or {}).get("name") == state:
                   continue
               graphql("""
