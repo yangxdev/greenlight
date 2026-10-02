@@ -305,7 +305,9 @@ Actions → **Setup labels** → *Run workflow*. It's safe to re-run.
    column header (or the **Status** field in the project settings) and rename *Todo*, *In progress* and *Done* to
    `idea`, `approved` and `blueprint-ready`. Then add `blueprint-ok`, `building`, `live`, `stuck` and `archived`, in
    that order.
-3. Link the repo: ⋯ (top right) → **Settings** → **Manage access** / **Linked repositories** → `greenlight`.
+3. Link the repo from the repo's side: the `greenlight` repo → **Projects** tab → **Link a project** → *Greenlight*.
+   The board then shows up in the repo's Projects tab. (The project's own **Manage access** page is for people, not
+   repos.)
 4. ⋯ → **Workflows**:
    - *Auto-add to project*: the `greenlight` repo, filter `is:issue`. Turn it on.
    - *Item closed*: set Status to `archived`. Turn it on.
