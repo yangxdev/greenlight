@@ -77,6 +77,7 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
   template-ci.yml           keeps template/ lint/test/build green
   scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it); Mondays start the Observer
   uptime.yml                every 6h: probe live products, store history in MongoDB
+  board-sync.yml            on label changes: set each card's Status on the Project board from its state label
   observer.yml              weekly, after the Scout: metrics -> Observer report + per-product verdicts; then starts Ideas
   scripts-ci.yml            keeps scout/ and observer/ typechecked, linted, tested
   ideas.yml                 weekly, after the Observer: Analyst + Critic -> analysis/<date>*.md, at most 3 `idea` issues
@@ -316,12 +317,19 @@ Actions → **Setup labels** → *Run workflow*. It's safe to re-run.
      (a pull request merged), or turn it off.
 5. Add a second view: **+ New view** → *Table*, and show the *Labels* column. Filter it with `label:stuck` or
    `label:building` for the "what needs me" view.
-6. Auto-add only picks up issues that are created or updated after you turn it on. Add any existing issue by hand:
-   **+ Add item** at the bottom of a column → paste the issue URL. Then set its Status.
+6. Let `board-sync.yml` move the cards. Labels are the source of truth because the workflows read and write them;
+   the board's Status only mirrors them, and nothing in GitHub does that on its own.
+   - GitHub → Settings → Developer settings → Personal access tokens → **Tokens (classic)** → Generate new token,
+     with only the **project** scope. A classic token is needed because fine-grained tokens can't reach a project
+     owned by a personal account. Save it as the repository secret `PROJECT_TOKEN`.
+   - Set the repository variable `GREENLIGHT_PROJECT` to the board's number (the `N` in
+     `github.com/users/<you>/projects/N`).
+   - Actions → **Board sync** → *Run workflow* once. After that it runs on every label change and after Ideas, the
+     Architect and Factory dispatch. Each run sets every idea issue's Status from its state label (an issue that is
+     both `live` and `stuck` shows as `stuck`, a closed one as `archived`) and adds idea issues the board is missing.
+     Issues without a state label, like the weekly reports, are left alone.
 
-Labels are the source of truth because the workflows read and write them. Board columns are only a view. In phase 1 you
-drag cards when you change a label. Syncing Status from labels automatically needs a token with Projects access,
-so it's left out on purpose.
+   Without the token or the variable it does nothing, and you drag cards by hand when a label changes.
 
 ### 6. Fill in `compass.md`
 
@@ -351,7 +359,6 @@ All nine actors exist. The next steps depend on running them for real:
   few weeks of `analysis/` output.
 - Key-action tracking: the Observer reports "no data" for each product's key action until products emit a counted event
   (for example a tiny `/api/event` Function writing to MongoDB).
-- Optional: sync Project board Status from labels (needs a token with Projects access).
 
 ## License
 

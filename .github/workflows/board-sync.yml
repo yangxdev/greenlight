@@ -1,0 +1,109 @@
+# Board sync: sets each card's Status on the Greenlight project board from its issue's state label. No AI, no
+# repository code. Labels stay the source of truth; this only mirrors them onto the board.
+#
+# Every run reconciles the whole board, so a missed event is fixed by the next one. Label changes made with the
+# workflow's own GITHUB_TOKEN (Ideas filing an idea, the Architect setting blueprint-ready) trigger no issue events,
+# so the runs of those workflows trigger a sync too.
+#
+# Needs the PROJECT_TOKEN secret (a classic token with only the `project` scope: fine-grained tokens can't reach a
+# project owned by a personal account) and the GREENLIGHT_PROJECT variable (the board's number, from its URL).
+# Without either, it does nothing.
+name: Board sync
+
+on:
+  issues:
+    types: [opened, reopened, closed, labeled, unlabeled]
+  workflow_run:
+    workflows: [Architect, Factory dispatch, Ideas]
+    types: [completed]
+  workflow_dispatch:
+
+concurrency:
+  group: board-sync
+  cancel-in-progress: true
+
+permissions:
+  issues: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Set Status from labels
+        env:
+          GH_TOKEN: ${{ secrets.PROJECT_TOKEN }}
+          ISSUES_TOKEN: ${{ github.token }}
+          PROJECT: ${{ vars.GREENLIGHT_PROJECT }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          [ -n "$GH_TOKEN" ] || { echo "::notice::No PROJECT_TOKEN secret, so the board isn't synced"; exit 0; }
+          [ -n "$PROJECT" ] || { echo "::notice::No GREENLIGHT_PROJECT variable, so the board isn't synced"; exit 0; }
+          python3 - <<'PY'
+          import json, os, subprocess, sys
+
+          # Most specific first: an issue that is both live and stuck shows as stuck, approved beats idea.
+          STATES = ["archived", "stuck", "live", "building", "blueprint-ok", "blueprint-ready", "approved", "idea"]
+          repo, owner, number = os.environ["GITHUB_REPOSITORY"], os.environ["OWNER"], int(os.environ["PROJECT"])
+
+          def graphql(query, **variables):
+              args = ["gh", "api", "graphql", "-f", f"query={query}"]
+              for key, value in variables.items():
+                  args += ["-F" if isinstance(value, int) else "-f", f"{key}={value}"]
+              return json.loads(subprocess.run(args, check=True, capture_output=True, text=True).stdout)["data"]
+
+          project = graphql("""
+            query($owner: String!, $number: Int!) {
+              user(login: $owner) { projectV2(number: $number) {
+                id
+                field(name: "Status") { ... on ProjectV2SingleSelectField { id options { id name } } }
+                items(first: 100) { nodes {
+                  id
+                  status: fieldValueByName(name: "Status") { ... on ProjectV2ItemFieldSingleSelectValue { name } }
+                  content { ... on Issue { number repository { nameWithOwner } } }
+                } }
+              } }
+            }""", owner=owner, number=number)["user"]["projectV2"]
+          if not project or not project["field"]:
+              sys.exit(f"::error::Project {number} of {owner}, or its Status field, was not found")
+          options = {o["name"]: o["id"] for o in project["field"]["options"]}
+          on_board = {
+              item["content"]["number"]: item
+              for item in project["items"]["nodes"]
+              if item["content"] and item["content"]["repository"]["nameWithOwner"] == repo
+          }
+
+          # Issues come from the repo itself, read with the workflow's own token.
+          env = dict(os.environ, GH_TOKEN=os.environ["ISSUES_TOKEN"])
+          issues = json.loads(subprocess.run(
+              ["gh", "issue", "list", "--repo", repo, "--state", "all", "--limit", "500",
+               "--json", "id,number,state,labels"],
+              check=True, capture_output=True, text=True, env=env).stdout)
+
+          for issue in issues:
+              names = {label["name"] for label in issue["labels"]}
+              state = "archived" if issue["state"] == "CLOSED" else next((s for s in STATES if s in names), None)
+              if state is None:
+                  continue  # not an idea (e.g. the weekly reports issue): left as it is
+              if state not in options:
+                  print(f"::warning::The board has no '{state}' Status option (README, Project board setup)")
+                  continue
+              item = on_board.get(issue["number"])
+              if item is None:
+                  if issue["state"] == "CLOSED":
+                      continue
+                  item = {"id": graphql("""
+                    mutation($project: ID!, $content: ID!) {
+                      addProjectV2ItemById(input: {projectId: $project, contentId: $content}) { item { id } }
+                    }""", project=project["id"], content=issue["id"])["addProjectV2ItemById"]["item"]["id"],
+                    "status": None}
+                  print(f"#{issue['number']}: added to the board")
+              if (item.get("status") or {}).get("name") == state:
+                  continue
+              graphql("""
+                mutation($project: ID!, $item: ID!, $field: ID!, $option: String!) {
+                  updateProjectV2ItemFieldValue(input: {projectId: $project, itemId: $item, fieldId: $field,
+                    value: {singleSelectOptionId: $option}}) { projectV2Item { id } }
+                }""", project=project["id"], item=item["id"], field=project["field"]["id"], option=options[state])
+              print(f"#{issue['number']}: Status -> {state}")
+          PY
