@@ -27,8 +27,7 @@ The Analyst, Critic and Architect read it.
 ## First run
 
 opt-out-log on 30 September 2026: the time each automated step took, from the Analyst starting on stored signals to
-the site answering its health check. Times come from the workflow runs and the bot comments on
-[issue #1](https://github.com/yangxdev/greenlight/issues/1).
+the site answering its health check. Times come from the workflow runs and the bot comments on the idea's issue.
 
 | Step | Took |
 |------|------|
