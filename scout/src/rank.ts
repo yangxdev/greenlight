@@ -27,7 +27,8 @@ export interface RankOptions {
 }
 
 export function painScore(signal: Pick<Signal, 'title' | 'text'>, phrases: string[]): number {
-  const haystack = `${signal.title}\n${signal.text}`.toLowerCase()
+  // Curly apostrophes become straight ones so "nothing I’ve found" matches the phrase "nothing i've found".
+  const haystack = `${signal.title}\n${signal.text}`.toLowerCase().replace(/[\u2018\u2019]/g, "'")
   return phrases.filter((phrase) => haystack.includes(phrase)).length
 }
 

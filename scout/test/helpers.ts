@@ -66,6 +66,11 @@ export function fixtureRoutes(url: URL): Response | undefined {
   if (url.hostname === 'api.stackexchange.com') return json(fixture('stackexchange-softwarerecs.json'))
   if (url.hostname === 'www.producthunt.com' && url.pathname === '/feed') return xml(fixture('producthunt-feed.xml'))
   if (url.hostname === 'lobste.rs') return xml(fixture('rss-lobsters.xml'))
+  // One forum of the shipped config answers; the others are skipped as failing, which the source tolerates.
+  if (url.hostname === 'forum.obsidian.md' || url.hostname === 'forum.example') {
+    if (url.pathname === '/latest.json') return json(fixture('discourse-latest.json'))
+    if (/^\/t\/50[12]\.json$/.test(url.pathname)) return json(fixture('discourse-topic.json'))
+  }
   return undefined
 }
 

@@ -1,13 +1,16 @@
-export type SourceName = 'hn' | 'reddit' | 'github' | 'producthunt' | 'stackexchange' | 'rss'
+export type SourceName = 'hn' | 'reddit' | 'github' | 'producthunt' | 'stackexchange' | 'discourse' | 'rss'
 
-export const SOURCE_NAMES: readonly SourceName[] = ['hn', 'reddit', 'github', 'producthunt', 'stackexchange', 'rss']
+export const SOURCE_NAMES: readonly SourceName[] = ['hn', 'reddit', 'github', 'producthunt', 'stackexchange', 'discourse', 'rss']
 
 /** One normalised item from any source. This is the Analyst's input record (plus rank fields on export). */
 export interface Signal {
   /** Stable id `<source>:<native id>`, used as the MongoDB `_id`. */
   id: string
   source: SourceName
-  /** Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`, `ask_hn_comment`), repo language, Stack Exchange site. */
+  /**
+   * Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`, `ask_hn_comment`), repo language,
+   * Stack Exchange site, Discourse forum name.
+   */
   channel: string
   /** Where the discussion lives: HN item, Reddit thread, repo page, Product Hunt post, feed item. */
   url: string
@@ -41,6 +44,13 @@ export interface FeedConfig {
   url: string
 }
 
+/** A public Discourse forum. `name` becomes the signal's channel. */
+export interface ForumConfig {
+  name: string
+  /** Site root without a trailing slash, e.g. `https://forum.obsidian.md`. */
+  url: string
+}
+
 export interface ScoutConfig {
   /** Sent with every request. Reddit asks for `<app>/<version> (by /u/<username>)`. */
   userAgent: string
@@ -62,6 +72,8 @@ export interface ScoutConfig {
   producthunt: { enabled: boolean; limit: number }
   /** `sites` are API site names, e.g. `softwarerecs` for softwarerecs.stackexchange.com. */
   stackexchange: { enabled: boolean; sites: string[]; minScore: number; pageSize: number }
+  /** `maxTopics` caps new topics per forum and run: each one costs a request for its opening post. */
+  discourse: { enabled: boolean; forums: ForumConfig[]; maxTopics: number }
   rss: { enabled: boolean; feeds: FeedConfig[] }
   /** Case-insensitive phrases that suggest someone is describing a problem. Used for ranking only. */
   painPhrases: string[]

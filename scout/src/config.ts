@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { SOURCE_NAMES, type FeedConfig, type ScoutConfig, type SourceName } from './types.ts'
+import { SOURCE_NAMES, type FeedConfig, type ForumConfig, type ScoutConfig, type SourceName } from './types.ts'
 
 type Json = unknown
 
@@ -60,6 +60,19 @@ function feeds(value: Json, path: string): FeedConfig[] {
   })
 }
 
+function forums(value: Json, path: string): ForumConfig[] {
+  if (!Array.isArray(value)) throw new ConfigError(`${path} must be an array`)
+  return value.map((v, i) => {
+    const forum = obj(v, `${path}[${i}]`)
+    // The name is a channel, so it can't hold the ":" that separates source and channel in export patterns.
+    const name = str(forum.name, `${path}[${i}].name`)
+    if (!/^[a-z0-9-]+$/.test(name)) throw new ConfigError(`${path}[${i}].name must be lowercase letters, digits and dashes`)
+    const url = str(forum.url, `${path}[${i}].url`)
+    if (!/^https:\/\/[^/?#]+$/.test(url)) throw new ConfigError(`${path}[${i}].url must be the forum's https:// root, with no path or trailing slash`)
+    return { name, url }
+  })
+}
+
 /** Validate parsed JSON into a ScoutConfig. Keys starting with "_" are comments and ignored. */
 export function parseConfig(raw: Json): ScoutConfig {
   const c = obj(raw, 'config')
@@ -69,6 +82,7 @@ export function parseConfig(raw: Json): ScoutConfig {
   const github = obj(c.github, 'github')
   const producthunt = obj(c.producthunt, 'producthunt')
   const stackexchange = obj(c.stackexchange, 'stackexchange')
+  const discourse = obj(c.discourse, 'discourse')
   const rss = obj(c.rss, 'rss')
   const exp = obj(c.export, 'export')
 
@@ -127,6 +141,11 @@ export function parseConfig(raw: Json): ScoutConfig {
       sites,
       minScore: num(stackexchange.minScore, 'stackexchange.minScore'),
       pageSize,
+    },
+    discourse: {
+      enabled: bool(discourse.enabled, 'discourse.enabled'),
+      forums: forums(discourse.forums, 'discourse.forums'),
+      maxTopics: num(discourse.maxTopics, 'discourse.maxTopics', 1),
     },
     rss: { enabled: bool(rss.enabled, 'rss.enabled'), feeds: feeds(rss.feeds, 'rss.feeds') },
     painPhrases: strings(c.painPhrases, 'painPhrases').map((p) => p.toLowerCase()),

@@ -81,10 +81,10 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
   observer.yml              weekly, after the Scout: metrics -> Observer report + per-product verdicts; then starts Ideas
   scripts-ci.yml            keeps scout/ and observer/ typechecked, linted, tested
   ideas.yml                 weekly, after the Observer: Analyst + Critic -> analysis/<date>*.md, at most 3 `idea` issues
-analysis/                   weekly idea cards and Critic verdicts, committed by ideas.yml
+analysis/                   weekly idea cards, Critic verdicts and the near-miss watchlist, committed by ideas.yml
 observer/                   Observer data scripts: uptime probes, Web Analytics, weekly metrics.json (see observer/README.md)
 reports/                    weekly reports (<week>.md) and verdicts (<week>.json), committed by observer.yml
-scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Exchange, RSS fetchers + ranked export (see scout/README.md)
+scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Exchange, Discourse, RSS fetchers + ranked export (see scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
   CLAUDE.md                 stack conventions, Look & feel (house style), README, R2/Mongo usage, testing rules, definition of done
@@ -118,7 +118,9 @@ snapshot.
      Product Hunt launches and new GitHub projects (searched, not read whole), and the existing idea titles;
    - the **Analyst** (AI, about 20 turns) writes idea cards to `analysis/<date>.md`;
    - the **Critic** (AI, fresh context, about 15 turns) checks the cards' evidence against the signals and scores them
-     on the compass rubric. It writes `analysis/<date>-critic.md` and returns a JSON verdict;
+     on the compass rubric. It writes `analysis/<date>-critic.md` and returns a JSON verdict. Cards scoring 11–13 go
+     on `analysis/watchlist.md` with their verified evidence; the next weeks' Analysts check new signals against it,
+     so a problem that comes up once a month can still add up to a filed idea. Delete an entry to stop watching it;
    - `publish` (no AI) commits `analysis/` and files at most `CRITIC_MAX_IDEAS` (3) issues scoring at least
      `CRITIC_MIN_SCORE` (14/20), skipping titles that already exist and defusing @mentions.
    It never adds `approved`, and bot-filed issues trigger nothing.
@@ -222,7 +224,7 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 
 Fork the repo, or push a copy to a new repository of your own. On a fork, open the **Actions** tab and enable
 workflows: GitHub turns them off on forks, and scheduled runs stay off until you do. Delete `analysis/` (the original's
-weekly idea cards); `compass.md` and `scout/config.json` get your own values in step 6.
+weekly idea cards and watchlist; the Critic starts a new watchlist); `compass.md` and `scout/config.json` get your own values in step 6.
 
 ### 1. Claude OAuth token (Pro plan)
 

@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       sources:
-        description: Comma-separated subset (hn,reddit,github,producthunt,stackexchange,rss). Empty means all enabled.
+        description: Comma-separated subset (hn,reddit,github,producthunt,stackexchange,discourse,rss). Empty means all enabled.
         required: false
       days:
         description: One-off backfill, look back this many days (1-30). Empty means the normal daily window.

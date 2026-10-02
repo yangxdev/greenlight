@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { discourse } from '../src/sources/discourse.ts'
 import { github } from '../src/sources/github.ts'
 import { hn } from '../src/sources/hn.ts'
 import { producthunt } from '../src/sources/producthunt.ts'
@@ -323,6 +324,84 @@ describe('stackexchange', () => {
 
     const down = fakeFetch(() => new Response('unavailable', { status: 400 }))
     await expect(stackexchange.fetch(makeCtx(down, { config: two }))).rejects.toThrow('all sites failed')
+  })
+})
+
+describe('discourse', () => {
+  const oneForum = configWith((c) => {
+    c.discourse.forums = [{ name: 'garden', url: 'https://forum.example' }]
+  })
+
+  it('keeps new, listed, unpinned topics with the text of their opening post', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const signals = await discourse.fetch(makeCtx(f, { config: oneForum }))
+
+    expect(signals.map((s) => s.id)).toEqual(['discourse:garden:501', 'discourse:garden:502'])
+    const url = 'https://forum.example/t/tracking-which-plants-i-watered-when/501'
+    expect(signals[0]).toEqual({
+      id: 'discourse:garden:501',
+      source: 'discourse',
+      channel: 'garden',
+      url,
+      link: url,
+      title: 'Tracking which plants I watered & when',
+      text: "I keep a spreadsheet of when I watered each plant, and I'm tired of it.\nIs there a simple way to see which ones are overdue?",
+      score: 6,
+      comments: 3,
+      createdAt: '2026-09-29T08:00:00.000Z',
+    })
+    // The listing is by creation date, and an older topic on the first page means there is no need for a second.
+    expect(f.calls.map((c) => c.url)).toEqual([
+      'https://forum.example/latest.json?order=created',
+      'https://forum.example/t/501.json',
+      'https://forum.example/t/502.json',
+    ])
+  })
+
+  it('pages through a long window and stops at maxTopics', async () => {
+    const latest = JSON.parse(fixture('discourse-latest.json'))
+    const fresh = latest.topic_list.topics.filter((t: { id: number }) => t.id === 501)
+    const page = (topics: unknown[], more: boolean) => ({ topic_list: { topics, ...(more ? { more_topics_url: '/latest?page=x' } : {}) } })
+    const f = fakeFetch((url) => {
+      if (url.pathname === '/latest.json') {
+        const n = Number(url.searchParams.get('page') ?? 0)
+        return json(page([{ ...fresh[0], id: 600 + n }], true))
+      }
+      return json(fixture('discourse-topic.json'))
+    })
+    const capped = configWith((c) => {
+      c.discourse.forums = [{ name: 'garden', url: 'https://forum.example' }]
+      c.discourse.maxTopics = 3
+    })
+    const ctx = makeCtx(f, { config: capped })
+    const signals = await discourse.fetch(ctx)
+
+    expect(signals.map((s) => s.id)).toEqual(['discourse:garden:600', 'discourse:garden:601', 'discourse:garden:602'])
+    expect(ctx.logs).toContain('discourse: garden has more than 3 new topics; only the newest are kept')
+  })
+
+  it('keeps a topic whose opening post fails, skips a failing forum and fails when all of them fail', async () => {
+    const two = configWith((c) => {
+      c.discourse.forums = [
+        { name: 'garden', url: 'https://forum.example' },
+        { name: 'down', url: 'https://down.example' },
+      ]
+    })
+    const f = fakeFetch((url) => {
+      if (url.hostname === 'down.example') return new Response('bad gateway', { status: 502 })
+      if (url.pathname === '/t/502.json') return new Response('gone', { status: 404 })
+      return fixtureRoutes(url)
+    })
+    const ctx = makeCtx(f, { config: two })
+    const signals = await discourse.fetch(ctx)
+
+    expect(signals.map((s) => s.id)).toEqual(['discourse:garden:501', 'discourse:garden:502'])
+    expect(signals[1]?.text).toBe('')
+    expect(ctx.logs).toContain('discourse: garden: 1 topic(s) kept without their text')
+    expect(ctx.logs.some((l) => l.startsWith('discourse: skipped down: HTTP 502'))).toBe(true)
+
+    const down = fakeFetch(() => new Response('unavailable', { status: 503 }))
+    await expect(discourse.fetch(makeCtx(down, { config: two }))).rejects.toThrow('all forums failed')
   })
 })
 

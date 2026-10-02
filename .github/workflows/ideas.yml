@@ -3,7 +3,8 @@
 #
 #   export   (no AI)         ranked Scout export + titles of existing idea issues
 #   analyst  (AI, no PAT)    clusters signals into idea cards -> analysis/<date>.md
-#   critic   (AI, no PAT)    fresh context; scores the cards -> analysis/<date>-critic.md + JSON verdict
+#   critic   (AI, no PAT)    fresh context; scores the cards -> analysis/<date>-critic.md + JSON verdict, and keeps
+#                            analysis/watchlist.md (near misses whose evidence can add up across weeks)
 #   publish  (no AI)         commits analysis/, files issues. It enforces the score threshold and the cap itself,
 #                            and neutralises @mentions from internet-sourced text.
 #
@@ -180,6 +181,7 @@ jobs:
             - .greenlight-run/existing-ideas.md: idea issues that already exist (don't duplicate them)
             - templates/idea.md: the idea card format
             - reports/*.md: the most recent weekly report, if the folder exists
+            - analysis/watchlist.md: earlier near misses to check this week's signals against
 
             Output: write analysis/${{ needs.export.outputs.date }}.md. Do not create or modify any other file.
           claude_args: >-
@@ -239,19 +241,23 @@ jobs:
             - .greenlight-run/competition.jsonl: recent launches and new projects (search it for the competition score)
             - .greenlight-run/existing-ideas.md: idea issues that already exist
             - templates/idea.md: the card format for each returned idea's body
+            - analysis/watchlist.md: earlier near misses and the evidence already verified for them
 
-            Write analysis/${{ needs.export.outputs.date }}-critic.md, then return the structured result.
-            Do not create or modify any other file.
+            Write analysis/${{ needs.export.outputs.date }}-critic.md, update analysis/watchlist.md, then return the
+            structured result. Do not create or modify any other file.
           claude_args: >-
             --max-turns ${{ vars.CRITIC_MAX_TURNS || '25' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
             --json-schema '{"type":"object","additionalProperties":false,"required":["summary","ideas"],"properties":{"summary":{"type":"string"},"ideas":{"type":"array","maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["name","scores","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"scores":{"type":"object","additionalProperties":false,"required":["pain","competition","mvp","reach"],"properties":{"pain":{"type":"integer","minimum":0,"maximum":5},"competition":{"type":"integer","minimum":0,"maximum":5},"mvp":{"type":"integer","minimum":0,"maximum":5},"reach":{"type":"integer","minimum":0,"maximum":5}}},"body":{"type":"string","minLength":50}}}}}}'
 
+      # Both files sit in analysis/, so the artifact keeps their names and the publish job restores them there.
       - uses: actions/upload-artifact@v7
         with:
           name: critic
-          path: analysis/${{ needs.export.outputs.date }}-critic.md
+          path: |
+            analysis/${{ needs.export.outputs.date }}-critic.md
+            analysis/watchlist.md
           if-no-files-found: warn
           retention-days: 14
 
