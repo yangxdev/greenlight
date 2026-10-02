@@ -37,6 +37,8 @@ Approved only when the product needs them (the blueprint says which and why):
 
 ## Look & feel
 
+The full rules, shared with yangxdev.com and waypoint and used for every image, are in `DESIGN.md`. In short:
+
 Every product looks like a sibling of my own site, yangxdev.com, which takes its structure from sakana.ai: warm
 neutrals, hairline separation, light first (dark available and remembered), one vermilion accent (朱色) used
 sparingly, Geist type. The product template already implements this (tokens in `src/index.css`, components in

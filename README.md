@@ -63,6 +63,7 @@ To regenerate a blueprint, comment your feedback on the issue (your comments are
 
 ```
 compass.md                  your interests, stack, no-go list, definition of "good"
+DESIGN.md                   the design language: tokens, type, layout, registers, image style, mascot brief
 templates/                  idea.md, blueprint.md, weekly-report.md (handoff formats)
 .claude/agents/             analyst.md, critic.md, architect.md, blueprint-reviewer.md, observer.md (role prompts)
 .github/ISSUE_TEMPLATE/     idea.yml (hand-write ideas)
