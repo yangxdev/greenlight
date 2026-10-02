@@ -14,6 +14,8 @@ export interface GhIssue {
 export interface GhComment {
   body: string | null
   created_at: string
+  user?: { login: string } | null
+  author_association?: string
 }
 
 function headers(ctx: Ctx, accept = 'application/vnd.github+json'): Record<string, string> {

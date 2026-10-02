@@ -68,7 +68,7 @@ describe('parseProductComments', () => {
 })
 
 describe('discoverProducts', () => {
-  it('returns open live issues with their markers', async () => {
+  it('returns open live issues with their markers, ignoring markers from strangers', async () => {
     const products = await discoverProducts(makeCtx(fakeFetch(world())), 'me/greenlight')
     expect(products).toEqual([
       {

@@ -50,8 +50,9 @@ export function world(options: { healthy?: boolean } = {}): (url: URL, init?: Re
       }
       if (url.pathname === '/repos/me/greenlight/issues/7/comments') {
         return json([
-          { body: '📐 **Architect:** blueprint ready\n\n<!-- greenlight:repo=me/invoice-nudge -->', created_at: '2026-09-02T00:00:00Z' },
-          { body: '🚀 **Publisher:** live at https://invoice-nudge.pages.dev\n<!-- greenlight:url=https://invoice-nudge.pages.dev -->', created_at: '2026-09-10T12:00:00Z' },
+          { body: '📐 **Architect:** blueprint ready\n\n<!-- greenlight:repo=me/invoice-nudge -->', created_at: '2026-09-02T00:00:00Z', user: { login: 'github-actions[bot]' }, author_association: 'NONE' },
+          { body: '🚀 **Publisher:** live at https://invoice-nudge.pages.dev\n<!-- greenlight:url=https://invoice-nudge.pages.dev -->', created_at: '2026-09-10T12:00:00Z', user: { login: 'me' }, author_association: 'OWNER' },
+          { body: 'nice <!-- greenlight:repo=stranger/elsewhere --> <!-- greenlight:url=https://elsewhere.pages.dev -->', created_at: '2026-09-11T00:00:00Z', user: { login: 'stranger' }, author_association: 'NONE' },
         ])
       }
       if (url.pathname === '/repos/me/invoice-nudge/contents/blueprint.md') {

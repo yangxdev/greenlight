@@ -7,6 +7,12 @@ const APP_URL = /https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:workers|pages)\.dev\b
 
 const lastMatch = (text: string, pattern: RegExp) => [...text.matchAll(pattern)].at(-1)
 
+const WRITERS = new Set(['OWNER', 'MEMBER', 'COLLABORATOR'])
+
+/** Markers count only from the workflow bot or people with write access: anyone can comment on a public issue. */
+export const isTrustedComment = (comment: GhComment) =>
+  comment.user?.login === 'github-actions[bot]' || WRITERS.has(comment.author_association ?? '')
+
 /**
  * Read what the pipeline recorded in an issue's comments: the product repo (Architect marker) and the live URL
  * (Publisher marker, falling back to a *.workers.dev or *.pages.dev link in a Publisher comment for older or
@@ -35,7 +41,7 @@ export async function discoverProducts(ctx: Ctx, greenlightRepo: string): Promis
   const products: Product[] = []
   for (const issue of issues.filter((i) => !i.pull_request)) {
     const comments = await ghList<GhComment>(ctx, `/repos/${greenlightRepo}/issues/${issue.number}/comments`)
-    products.push({ issue: issue.number, title: issue.title, ...parseProductComments(comments) })
+    products.push({ issue: issue.number, title: issue.title, ...parseProductComments(comments.filter(isTrustedComment)) })
   }
   return products
 }

@@ -30,7 +30,9 @@ jobs:
       - name: Find product repo
         id: repo
         run: |
-          full=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate --jq '.[].body' \
+          # Only the workflow bot's or a collaborator's marker counts: anyone can comment on a public issue.
+          full=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" or .author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | .body' \
             | grep -oE 'greenlight:repo=[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | tail -n1 | cut -d= -f2 || true)
           if [ -z "$full" ]; then
             gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \

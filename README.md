@@ -218,6 +218,12 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 
 ## One-time setup
 
+### 0. Your copy
+
+Fork the repo, or push a copy to a new repository of your own. On a fork, open the **Actions** tab and enable
+workflows: GitHub turns them off on forks, and scheduled runs stay off until you do. Delete `analysis/` (the original's
+weekly idea cards); `compass.md` and `scout/config.json` get your own values in step 6.
+
 ### 1. Claude OAuth token (Pro plan)
 
 On your machine, logged in to your **personal** Claude account:

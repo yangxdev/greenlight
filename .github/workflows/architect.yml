@@ -63,8 +63,10 @@ jobs:
           TITLE: ${{ github.event.issue.title }}
           PREFIX: ${{ vars.PRODUCT_PREFIX }}
         run: |
-          # Re-runs reuse the repo recorded by an earlier Architect comment on this issue.
-          recorded=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate --jq '.[].body' \
+          # Re-runs reuse the repo recorded by an earlier Architect comment on this issue. Only comments from the
+          # workflow bot or people with write access count: anyone can comment on a public issue.
+          recorded=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
+            --jq '.[] | select(.user.login == "github-actions[bot]" or .author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | .body' \
             | grep -oE 'greenlight:repo=[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | tail -n1 | cut -d= -f2 || true)
           if [ -n "$recorded" ]; then
             full="$recorded"
