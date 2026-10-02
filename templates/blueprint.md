@@ -15,6 +15,7 @@ What v1 does, in 3–6 bullets, from the user's point of view. Screens (max 3) a
 
 How the product looks and introduces itself (see the template's CLAUDE.md → "Look & feel").
 - **Tag:** 2–4 lowercase words shown in mono next to the name, e.g. `privacy switch log`.
+- **Description:** one plain sentence for search results and link previews: what it does, for whom.
 - **Headline:** the hero's h1, real copy, with at most one word marked as the accent, e.g. `Switches worth *checking* again.`
 - **Sections:** the numbered sections in page order, each a one- or two-word rail label and what it holds, e.g.
   `01 Checklist: the switches, filterable by platform`. The tool itself is `01`.

@@ -33,7 +33,7 @@ src/
   index.css           # Tailwind import + @theme tokens (the only global CSS)
   app/store.ts        # makeStore(), RootState, AppDispatch (register slices in combineSlices)
   app/hooks.ts        # useAppDispatch / useAppSelector (always use these)
-  app/site.ts         # SITE_NAME, SITE_TAG: the product's identity
+  app/site.ts         # SITE_NAME, SITE_TAG, SITE_DESCRIPTION: identity, page title and link previews
   features/<name>/    # one folder per feature: <name>Slice.ts, components, <name>.test.ts(x)
   components/shell/   # page structure: SiteHeader, Hero (+ Accent), Section (numbered rail), SiteFooter
   components/ui/      # house-style primitives: Button, IconButton, Checkbox, Field, Segmented, RuledList/RuledItem,
@@ -102,9 +102,10 @@ rules below.
 
 **Identity** (the blueprint's "Identity" section decides it; set it in the first UI task)
 
-- `src/app/site.ts`: `SITE_NAME` (lowercase, it is the wordmark) and `SITE_TAG` (2–4 lowercase words, like
-  sakana.ai's "japan-vibes LLM"). `index.html`'s `<title>` is the name and the headline; the scaffold already put the
-  product's initial in `public/favicon.svg`.
+- `src/app/site.ts`: `SITE_NAME` (lowercase, it is the wordmark), `SITE_TAG` (2–4 lowercase words, like sakana.ai's
+  "japan-vibes LLM") and `SITE_DESCRIPTION` (one plain sentence: what it does, for whom). The build turns them into the
+  page title and the description and link-preview tags (`vite.config.ts`), so never hand-edit those in `index.html`.
+  The scaffold already put the product's initial in `public/favicon.svg`.
 - The `Mark` and the lowercase name are the logo. Never draw an icon, a gradient blob or an illustration instead, and
   never borrow yangxdev.com's personal branding (its kanji seal, Japanese glosses, vertical labels).
 
