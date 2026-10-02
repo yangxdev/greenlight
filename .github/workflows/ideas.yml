@@ -167,6 +167,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          # The Monday chain starts this workflow as github-actions[bot], which the action refuses by default.
+          allowed_bots: github-actions
           prompt: |
             You are the Greenlight Analyst. Your role instructions are in .claude/agents/analyst.md.
             Read them first and follow them exactly.
@@ -224,6 +226,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          # The Monday chain starts this workflow as github-actions[bot], which the action refuses by default.
+          allowed_bots: github-actions
           prompt: |
             You are the Greenlight Critic. Your role instructions are in .claude/agents/critic.md.
             Read them first and follow them exactly.
