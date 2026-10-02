@@ -6,13 +6,21 @@
 #   critic   (AI, no PAT)    fresh context; scores the cards -> analysis/<date>-critic.md + JSON verdict
 #   publish  (no AI)         commits analysis/, files issues. It enforces the score threshold and the cap itself,
 #                            and neutralises @mentions from internet-sourced text.
+#
+# Mondays: the Observer starts this (chain=true) after the Scout's Monday run, so the Analyst gets that day's signals
+# and the week's report. The schedule is only a fallback; a run that finds today's analysis already committed stops
+# at the gate, so the Analyst never runs twice in a day by itself.
 name: Ideas
 
 on:
   schedule:
-    - cron: "13 6 * * 1" # Mondays 06:13 UTC, after that day's Scout run
+    - cron: "13 15 * * 1" # fallback, Mondays 15:13 UTC
   workflow_dispatch:
     inputs:
+      chain:
+        description: Part of the Monday chain. Skips if today's analysis exists. Leave off by hand.
+        type: boolean
+        default: false
       days:
         description: Analyse signals from the last N days (1-30). Empty means 7. Backfill the Scout first for older ones.
         required: false
@@ -28,7 +36,31 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - name: Has today been analysed?
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHAIN: ${{ inputs.chain }}
+        run: |
+          today=$(date -u +%F)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$CHAIN" != true ]; then
+            echo "Started by hand"; run=true
+          elif gh api "repos/$GITHUB_REPOSITORY/contents/analysis/$today.md" --silent 2>/dev/null; then
+            echo "analysis/$today.md already exists"; run=false
+          else
+            run=true
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   export:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -83,12 +115,13 @@ jobs:
             export_args+=(--limit "$LIMIT")
           fi
           if [ -n "$MONGODB_URI" ]; then
-            node src/cli.ts export "${export_args[@]}" --out "$out/signals.jsonl"
+            node src/cli.ts export "${export_args[@]}" --out "$out/signals.jsonl" --context-out "$out/competition.jsonl"
           else
             echo "::notice::MONGODB_URI is not set, so this run fetches its own signals instead of reading the stored ones"
             node src/cli.ts fetch ${DAYS:+--days "$DAYS"} --out "$RUNNER_TEMP/raw.jsonl" || true
             [ -f "$RUNNER_TEMP/raw.jsonl" ] || : > "$RUNNER_TEMP/raw.jsonl"
-            node src/cli.ts export "${export_args[@]}" --from "$RUNNER_TEMP/raw.jsonl" --out "$out/signals.jsonl"
+            node src/cli.ts export "${export_args[@]}" --from "$RUNNER_TEMP/raw.jsonl" --out "$out/signals.jsonl" \
+              --context-out "$out/competition.jsonl"
           fi
           count=$(wc -l < "$out/signals.jsonl" | tr -d ' ')
           {
@@ -141,6 +174,7 @@ jobs:
             Inputs:
             - compass.md: the owner's interests, stack, no-go list and definition of "good"
             - .greenlight-run/signals.jsonl: ${{ needs.export.outputs.count }} ranked signals from the Scout
+            - .greenlight-run/competition.jsonl: recent launches and new projects. Search it, don't read it whole
             - .greenlight-run/existing-ideas.md: idea issues that already exist (don't duplicate them)
             - templates/idea.md: the idea card format
             - reports/*.md: the most recent weekly report, if the folder exists
@@ -198,6 +232,7 @@ jobs:
             - compass.md
             - analysis/${{ needs.export.outputs.date }}.md: this week's idea cards from the Analyst
             - .greenlight-run/signals.jsonl: the signals the Analyst worked from (verify cited evidence here)
+            - .greenlight-run/competition.jsonl: recent launches and new projects (search it for the competition score)
             - .greenlight-run/existing-ideas.md: idea issues that already exist
             - templates/idea.md: the card format for each returned idea's body
 

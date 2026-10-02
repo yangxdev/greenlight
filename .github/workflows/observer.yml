@@ -7,12 +7,21 @@
 #                            comments on a product's issue only when its verdict changes. Never changes labels.
 #
 # With no live products the AI step is skipped and publish writes a short board-only report itself.
+#
+# Mondays: the Scout's Monday run starts this with chain=true, and this starts Ideas when it's done (the Analyst
+# reads the report). The schedule below is only a fallback for a Monday when that never happens; a run whose
+# report already exists stops at the gate, so the week is never reported twice.
 name: Observer
 
 on:
   schedule:
-    - cron: "47 4 * * 1" # Mondays 04:47 UTC, before that day's Scout and Ideas runs (the Analyst reads the report)
+    - cron: "29 13 * * 1" # fallback, Mondays 13:29 UTC
   workflow_dispatch:
+    inputs:
+      chain:
+        description: Part of the Monday chain. Skips if this week's report exists, then starts Ideas. Leave off by hand.
+        type: boolean
+        default: false
 
 concurrency:
   group: observer
@@ -22,7 +31,32 @@ permissions:
   contents: read
 
 jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - name: Has this week been reported?
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CHAIN: ${{ inputs.chain }}
+        run: |
+          # The week the report covers: the last complete ISO week, as in observer/src/week.ts.
+          week=$(date -u -d "$(date -u +%F) -$(( $(date -u +%u) + 6 )) days" +%G-W%V)
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] && [ "$CHAIN" != true ]; then
+            echo "Started by hand: reporting $week"; run=true
+          elif gh api "repos/$GITHUB_REPOSITORY/contents/reports/$week.md" --silent 2>/dev/null; then
+            echo "reports/$week.md already exists"; run=false
+          else
+            echo "Reporting $week"; run=true
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+
   metrics:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -50,6 +84,9 @@ jobs:
           GREENLIGHT_REPO: ${{ github.repository }}
           # The PAT can read private product repos (blueprint success metrics); github.token cannot.
           GITHUB_TOKEN: ${{ secrets.GREENLIGHT_TOKEN || github.token }}
+          # The PAT's expiry is checked only when it is the PAT; github.token expires within the hour anyway.
+          TOKEN_IS_PAT: ${{ secrets.GREENLIGHT_TOKEN != '' }}
+          CLAUDE_TOKEN_EXPIRES: ${{ vars.CLAUDE_TOKEN_EXPIRES }}
           MONGODB_URI: ${{ secrets.MONGODB_URI }}
           MONGODB_DB: ${{ vars.MONGODB_DB || 'greenlight' }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -187,8 +224,14 @@ jobs:
             tracking=${url##*/}
           fi
           if [ -n "$RESULT" ]; then summary=$(jq -r .summary <<<"$RESULT"); else summary="No live products yet; board-only report."; fi
-          gh issue comment "$tracking" --repo "$GITHUB_REPOSITORY" \
-            --body "📊 **Observer, ${WEEK}:** ${summary}"$'\n\n'"Full report: ${report_url}"
+          # Credentials about to lapse go on top: when one expires, every workflow that uses it fails at once.
+          warnings=$(jq -r '.tokens[]? | select(.daysLeft <= 30)
+            | if .daysLeft < 0 then "⚠️ **\(.name) expired on \(.expiresOn).** \(.renew)"
+              else "⚠️ **\(.name) expires on \(.expiresOn) (\(.daysLeft) days).** \(.renew)" end' \
+            "$RUNNER_TEMP/observer/metrics.json")
+          body="📊 **Observer, ${WEEK}:** ${summary}"$'\n\n'"Full report: ${report_url}"
+          if [ -n "$warnings" ]; then body="${warnings}"$'\n\n'"${body}"; fi
+          gh issue comment "$tracking" --repo "$GITHUB_REPOSITORY" --body "$body"
 
           [ -n "$RESULT" ] || exit 0
           # Comment on a product's issue only when its verdict changed since the last report. Labels are never touched.
@@ -213,3 +256,17 @@ jobs:
             gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
             echo "Commented on #$issue: $before -> $verdict"
           done
+
+  # The next link of the Monday chain. Ideas runs even if this week's report failed or was already there.
+  ideas:
+    needs: [gate, metrics, report, publish]
+    if: always() && inputs.chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start Ideas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run ideas.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f chain=true

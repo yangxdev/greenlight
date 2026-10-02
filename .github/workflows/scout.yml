@@ -1,6 +1,9 @@
 # Scout: pulls free internet signals into MongoDB once a day. No AI, no PAT.
 # Without the MONGODB_URI secret it still runs and uploads the signals as a JSONL artifact,
 # so a manual run is a cheap way to see what the sources return.
+#
+# The Monday scheduled run also starts the weekly chain: Scout -> Observer -> Ideas. GitHub starts scheduled runs
+# hours late at times, so the weekly steps follow each other instead of trusting clock times.
 name: Scout
 
 on:
@@ -26,10 +29,19 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    outputs:
+      weekly: ${{ steps.weekly.outputs.weekly }}
     defaults:
       run:
         working-directory: scout
     steps:
+      - name: Is this the Monday run?
+        id: weekly
+        working-directory: .
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = schedule ] && [ "$(date -u +%u)" = 1 ]; then weekly=true; else weekly=false; fi
+          echo "weekly=$weekly" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
@@ -77,3 +89,17 @@ jobs:
           path: ${{ runner.temp }}/signals.jsonl
           if-no-files-found: ignore
           retention-days: 7
+
+  # Runs even if the fetch failed: the Observer and Ideas still have the rest of the week's signals.
+  weekly:
+    needs: fetch
+    if: always() && needs.fetch.outputs.weekly == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start the Observer, which then starts Ideas
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run observer.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f chain=true

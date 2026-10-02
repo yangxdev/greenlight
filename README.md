@@ -68,11 +68,11 @@ templates/                  idea.md, blueprint.md, weekly-report.md (handoff for
   architect.yml             on label "approved"
   factory-dispatch.yml      on label "blueprint-ok"
   template-ci.yml           keeps template/ lint/test/build green
-  scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it)
+  scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it); Mondays start the Observer
   uptime.yml                every 6h: probe live products, store history in MongoDB
-  observer.yml              weekly: metrics -> Observer report + per-product verdicts
+  observer.yml              weekly, after the Scout: metrics -> Observer report + per-product verdicts; then starts Ideas
   scripts-ci.yml            keeps scout/ and observer/ typechecked, linted, tested
-  ideas.yml                 weekly: Analyst + Critic -> analysis/<date>*.md, at most 3 `idea` issues
+  ideas.yml                 weekly, after the Observer: Analyst + Critic -> analysis/<date>*.md, at most 3 `idea` issues
 analysis/                   weekly idea cards and Critic verdicts, committed by ideas.yml
 observer/                   Observer data scripts: uptime probes, Web Analytics, weekly metrics.json (see observer/README.md)
 reports/                    weekly reports (<week>.md) and verdicts (<week>.json), committed by observer.yml
@@ -101,8 +101,12 @@ snapshot.
 
 ## How it works
 
-0. **Scout** (`scout.yml`, daily, no AI) stores signals. **Ideas** (`ideas.yml`, Mondays):
-   - `export` (no AI) takes the ranked Scout export (about 150 signals) and the existing idea titles;
+0. **Scout** (`scout.yml`, daily, no AI) stores signals. On Mondays its scheduled run starts the **Observer** (step 8),
+   which then starts **Ideas**. GitHub sometimes starts scheduled runs hours late, so the weekly steps follow each other
+   rather than clock times. Each has a Monday-afternoon fallback schedule, and skips itself when its output (this week's
+   report, today's analysis) already exists. Started by hand, they always run. **Ideas** (`ideas.yml`):
+   - `export` (no AI) takes the ranked Scout export (about 150 problem signals), a separate competition file of recent
+     Product Hunt launches and new GitHub projects (searched, not read whole), and the existing idea titles;
    - the **Analyst** (AI, about 20 turns) writes idea cards to `analysis/<date>.md`;
    - the **Critic** (AI, fresh context, about 15 turns) checks the cards' evidence against the signals and scores them
      on the compass rubric. It writes `analysis/<date>-critic.md` and returns a JSON verdict;
@@ -147,8 +151,9 @@ snapshot.
 8. **Observer**:
    - `uptime.yml` (every 6 hours, no AI) probes each `live` product's `/api/health` and `/` and stores the result in
      MongoDB, kept 35 days;
-   - `observer.yml` (Mondays, before Ideas) collects the week's uptime, Cloudflare Web Analytics visits (this week vs
-     last), each blueprint's success metric and the board state;
+   - `observer.yml` (Mondays, between the Scout and Ideas) collects the week's uptime, Cloudflare Web Analytics visits (this week vs
+     last), each blueprint's success metric, the board state, and when `GREENLIGHT_TOKEN`, the Cloudflare token and
+     the Claude token (from `CLAUDE_TOKEN_EXPIRES`) expire. A token within 30 days of expiry tops the weekly comment;
    - Claude writes `reports/<week>.md` with a keep, improve or archive verdict per product;
    - a shell job commits it and comments the summary on the **Greenlight weekly reports** issue. It comments on a
      product's issue only when its verdict changes, and never touches labels;
@@ -209,6 +214,9 @@ On your machine, logged in to your **personal** Claude account:
 claude setup-token        # prints a long-lived OAuth token for your Pro subscription
 ```
 
+It lasts a year. Set the repository variable `CLAUDE_TOKEN_EXPIRES` to that date (`YYYY-MM-DD`) so the Observer can
+warn you a month ahead. It reads the PAT's and the Cloudflare token's expiry by itself.
+
 ### 2. GitHub fine-grained PAT (`GREENLIGHT_TOKEN`)
 
 GitHub → Settings → Developer settings → Personal access tokens → **Fine-grained tokens** → Generate new token.
@@ -253,7 +261,7 @@ Scout secrets (all optional; the Scout runs without them):
 | `MONGODB_URI` | Atlas connection string (see below) | signals go to a JSONL artifact on each run instead of MongoDB |
 | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | a **script** app at reddit.com/prefs/apps, which needs Reddit's approval first. Greenlight's request was denied on 2026-10-01 ([details](scout/README.md#reddit-access)) | Reddit is skipped; the other sources still run |
 | `PRODUCTHUNT_TOKEN` | producthunt.com/v2/oauth/applications → developer token | public feed only, with no vote or comment counts |
-| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs 2 |
+| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs 6–10 a day for its six sites, so a key is recommended |
 
 **MongoDB Atlas (free M0):** create an M0 cluster, add a database user limited to read/write on the `greenlight` database,
 and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Copy the `mongodb+srv://…` string into
@@ -263,7 +271,8 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`public`|`private`, default `public`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
 `INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
-`CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), and `CLAUDE_MODEL` (passed as `--model`;
+`CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), `CLAUDE_TOKEN_EXPIRES`
+(`YYYY-MM-DD`, for the Observer's expiry warning), and `CLAUDE_MODEL` (passed as `--model`;
 empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can
 override them there per product.
 
