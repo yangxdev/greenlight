@@ -299,14 +299,23 @@ Actions → **Setup labels** → *Run workflow*. It's safe to re-run.
 
 ### 5. Create the Project board
 
-GitHub → your profile → Projects → **New project** → *Board*, named "Greenlight".
-- Settings → **Manage access / Linked repositories**: link `greenlight`.
-- Project menu → **Workflows**: turn on *Auto-add to project* with the filter `is:issue` for the `greenlight`
-  repo, and *Item closed* → set Status to the last column.
-- Rename the **Status** field's options to the states: `idea`, `approved`, `blueprint-ready`, `blueprint-ok`,
-  `building`, `live`, `stuck`, `archived`.
-- Add a second view as a **Table** that shows the *Labels* column. Filter it with `label:stuck` or `label:building`
-  for the "what needs me" view.
+1. GitHub → your profile → **Projects** → **New project** → *Board*, named "Greenlight". A new board starts with three
+   Status options: *Todo*, *In progress* and *Done*.
+2. Set the Status options before anything else, because the workflows below refer to them. Open the ⋯ menu on a
+   column header (or the **Status** field in the project settings) and rename *Todo*, *In progress* and *Done* to
+   `idea`, `approved` and `blueprint-ready`. Then add `blueprint-ok`, `building`, `live`, `stuck` and `archived`, in
+   that order.
+3. Link the repo: ⋯ (top right) → **Settings** → **Manage access** / **Linked repositories** → `greenlight`.
+4. ⋯ → **Workflows**:
+   - *Auto-add to project*: the `greenlight` repo, filter `is:issue`. Turn it on.
+   - *Item closed*: set Status to `archived`. Turn it on.
+   - The other built-in workflows were set up for *Todo* and *Done*, so after the rename they point at `idea` and
+     `blueprint-ready`. Open each one that is on: point it at `idea` (an item added or reopened) or `archived`
+     (a pull request merged), or turn it off.
+5. Add a second view: **+ New view** → *Table*, and show the *Labels* column. Filter it with `label:stuck` or
+   `label:building` for the "what needs me" view.
+6. Auto-add only picks up issues that are created or updated after you turn it on. Add any existing issue by hand:
+   **+ Add item** at the bottom of a column → paste the issue URL. Then set its Status.
 
 Labels are the source of truth because the workflows read and write them. Board columns are only a view. In phase 1 you
 drag cards when you change a label. Syncing Status from labels automatically needs a token with Projects access,
