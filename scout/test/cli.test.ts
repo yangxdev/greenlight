@@ -81,7 +81,7 @@ describe('scout fetch', () => {
 
     const signals = await readJsonl<Signal>(out)
     const sources = new Set(signals.map((s) => s.source))
-    expect([...sources].sort()).toEqual(['github', 'hn', 'producthunt', 'reddit', 'rss', 'stackexchange'])
+    expect([...sources].sort()).toEqual(['discourse', 'github', 'hn', 'producthunt', 'reddit', 'rss', 'stackexchange'])
     // Every subreddit returns the same fixture here; duplicates collapse by id.
     expect(signals.filter((s) => s.source === 'reddit')).toHaveLength(2)
     expect(new Set(signals.map((s) => s.id)).size).toBe(signals.length)

@@ -22,7 +22,8 @@ Node 22.18+ runs the TypeScript directly, so there is no build step.
 | `reddit` | `oauth.reddit.com/r/<sub>/top?t=day` for each subreddit in `config.json` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (app-only OAuth), which need Reddit's approval (see below) | Skipped, not failed, without credentials. One failing subreddit is skipped |
 | `github` | Search API: repos created in the last `createdWithinDays` with ≥ `minStars` | `GITHUB_TOKEN` (the workflow's own) | Stands in for "trending", which has no API |
 | `producthunt` | GraphQL API (votes, comments) | `PRODUCTHUNT_TOKEN` (developer token) | Falls back to the public Atom feed (no engagement numbers) |
-| `stackexchange` | API `/questions` (newest, with body) for each site in `config.json`: `softwarerecs`, `webapps`, `superuser`, `askubuntu`, `apple`, `android` | none; optional `STACKEXCHANGE_KEY` | Software Recommendations and Web Applications are people asking whether a tool exists; the support sites only reach the Analyst with a pain phrase. Closed and downvoted questions are dropped; `comments` counts answers. Without a key the quota is 300 requests a day per IP, shared with everyone on the same GitHub runner IP. One failing site is skipped |
+| `stackexchange` | API `/questions` (newest, with body) for each site in `config.json`: `softwarerecs` and `webapps`, the support sites (`superuser`, `askubuntu`, `apple`, `android`) and niche sites outside software (`academia`, `workplace`, `diy`, `woodworking`, `gardening`, `photo`, `graphicdesign`, `boardgames`, `crafts`, `3dprinting`, `parenting`, `cooking`) | none; optional `STACKEXCHANGE_KEY` | Software Recommendations and Web Applications are people asking whether a tool exists; the support and niche sites only reach the Analyst with a pain phrase. Money, law and health sites are left out because the compass rules out that advice. Closed and downvoted questions are dropped; `comments` counts answers. Without a key the quota is 300 requests a day per IP, shared with everyone on the same GitHub runner IP. One failing site is skipped |
+| `discourse` | `<forum>/latest.json?order=created` for each forum in `config.json`, then `<forum>/t/<id>.json` for the opening post of each new topic (at most `maxTopics`, 30, per forum) | none | Public JSON that every Discourse site serves; the default `robots.txt` only disallows search, RSS and user pages. Starts with Obsidian, Home Assistant, OpenStreetMap, Anki, PIXLS.US (photography), Glowforge (laser cutting) and Shopify (merchants). Pinned and unlisted topics are skipped; `score` is likes, `comments` is replies. Forum topics only reach the Analyst with a pain phrase. One failing forum, or a topic whose post fails, is skipped. Check a forum's `robots.txt` and terms before adding it |
 | `rss` | Any RSS 2.0 / RSS 1.0 / Atom feed in `config.json` | none | One failing feed is skipped |
 
 A source that fails is logged as a warning and the run continues. The run only fails when every source fails.
@@ -54,10 +55,10 @@ the agents run on.
 ## Backfill (one-off, wider window)
 
 To look further back than a day: Actions → **Scout** → *Run workflow* with `days` (1–30), then Actions → **Ideas** →
-*Run workflow* with the same `days` (and optionally a higher `limit`, up to 300). Only HN and Stack Exchange really
-search back in time; Product Hunt still returns at most `producthunt.limit` launches, and Reddit, RSS and GitHub
-keep their usual windows. HN and Stack Exchange page
-through results (up to 1,000 per query) instead of stopping at the first page. Scheduled runs are unaffected.
+*Run workflow* with the same `days` (and optionally a higher `limit`, up to 300). Only HN, Stack Exchange and
+Discourse really search back in time; Product Hunt still returns at most `producthunt.limit` launches, and Reddit, RSS
+and GitHub keep their usual windows. HN and Stack Exchange page through results (up to 1,000 per query) instead of
+stopping at the first page; Discourse stops at `maxTopics` per forum. Scheduled runs are unaffected.
 
 ## Data
 
@@ -78,10 +79,12 @@ Atlas M0's 512 MB.
 GitHub projects): they show what people build, not what they struggle with, so they don't take the Analyst's slots.
 With `--context-out` they go to a separate competition file (at most `contextLimit`, 300, most engaged first) that the
 Analyst and Critic search rather than read. Of the rest, it leaves out `dropWithoutPain` channels (plain HN news
-`hn:story`, Ask HN replies `hn:ask_hn_comment`, and the Stack Exchange support sites) that contain no pain phrase,
-and ranks what remains:
+`hn:story`, Ask HN replies `hn:ask_hn_comment`, the Stack Exchange support and niche sites, and the Discourse forums)
+that contain no pain phrase, and ranks what remains:
 - 60% engagement percentile within the signal's own source (comments count double),
-- 40% `painPhrases` found in title and text (capped at 3),
+- 40% `painPhrases` found in title and text (capped at 3). Besides direct asks ("is there a tool"), they include
+  workaround language ("workaround", "right now i just", "nothing i've found"), which marks a problem someone already
+  lives with; curly apostrophes match straight ones,
 - +`questionBoost` (0.25, about two pain phrases) for `questionChannels`, where people ask for tools or describe
   problems: Ask HN questions and replies, Stack Exchange, r/SomebodyMakeThis, r/AppIdeas,
 - +0.1 when the same `link` shows up on several sources (they're merged, see `alsoSeenIn`).

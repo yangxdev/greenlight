@@ -36,6 +36,10 @@ describe('painScore', () => {
     expect(painScore({ title: 'Is there a TOOL for this?', text: "I'm tired of doing it manually. Manually!" }, options.painPhrases)).toBe(3)
     expect(painScore({ title: 'Show HN: my app', text: '' }, options.painPhrases)).toBe(0)
   })
+
+  it('matches straight-apostrophe phrases against curly apostrophes', () => {
+    expect(painScore({ title: 'Nothing I’ve found does this', text: '' }, ["nothing i've found"])).toBe(1)
+  })
 })
 
 describe('sourcePercentiles', () => {

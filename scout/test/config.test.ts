@@ -43,6 +43,14 @@ describe('config', () => {
     expect(() => parseConfig(c)).toThrow('github must be an object')
   })
 
+  it('rejects forum URLs with a path and forum names that would break channel patterns', () => {
+    const c = raw()
+    c.discourse = { ...c.discourse, forums: [{ name: 'x', url: 'https://forum.example/latest' }] }
+    expect(() => parseConfig(c)).toThrow("discourse.forums[0].url must be the forum's https:// root")
+    c.discourse = { ...c.discourse, forums: [{ name: 'a:b', url: 'https://forum.example' }] }
+    expect(() => parseConfig(c)).toThrow('discourse.forums[0].name must be lowercase letters, digits and dashes')
+  })
+
   it('rejects feeds without an http(s) URL', () => {
     const c = raw()
     c.rss = { ...c.rss, feeds: [{ name: 'x', url: 'file:///etc/passwd' }] }

@@ -1,0 +1,75 @@
+{
+  "users": [{ "id": 1, "username": "someone" }],
+  "topic_list": {
+    "can_create_topic": false,
+    "more_topics_url": "/latest?order=created&page=1",
+    "per_page": 30,
+    "topics": [
+      {
+        "id": 400,
+        "title": "About the Feature requests category",
+        "fancy_title": "About the Feature requests category",
+        "slug": "about-the-feature-requests-category",
+        "posts_count": 1,
+        "reply_count": 0,
+        "created_at": "2024-01-01T00:00:00.000Z",
+        "like_count": 40,
+        "views": 9000,
+        "pinned": true,
+        "visible": true
+      },
+      {
+        "id": 501,
+        "title": "Tracking which plants I watered &amp; when",
+        "fancy_title": "Tracking which plants I watered &amp; when",
+        "slug": "tracking-which-plants-i-watered-when",
+        "posts_count": 4,
+        "reply_count": 2,
+        "created_at": "2026-09-29T08:00:00.000Z",
+        "like_count": 6,
+        "views": 120,
+        "pinned": false,
+        "visible": true
+      },
+      {
+        "id": 502,
+        "title": "Export a deck to a printable sheet",
+        "fancy_title": "Export a deck to a printable sheet",
+        "slug": "export-a-deck-to-a-printable-sheet",
+        "posts_count": 1,
+        "reply_count": 0,
+        "created_at": "2026-09-28T20:00:00.000Z",
+        "like_count": 0,
+        "views": 15,
+        "pinned": false,
+        "visible": true
+      },
+      {
+        "id": 503,
+        "title": "Unlisted topic",
+        "fancy_title": "Unlisted topic",
+        "slug": "unlisted-topic",
+        "posts_count": 1,
+        "reply_count": 0,
+        "created_at": "2026-09-28T19:00:00.000Z",
+        "like_count": 0,
+        "views": 2,
+        "pinned": false,
+        "visible": false
+      },
+      {
+        "id": 499,
+        "title": "An older topic",
+        "fancy_title": "An older topic",
+        "slug": "an-older-topic",
+        "posts_count": 9,
+        "reply_count": 7,
+        "created_at": "2026-09-27T09:00:00.000Z",
+        "like_count": 3,
+        "views": 300,
+        "pinned": false,
+        "visible": true
+      }
+    ]
+  }
+}

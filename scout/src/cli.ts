@@ -20,7 +20,7 @@ export interface Deps {
 const DEFAULT_CONFIG = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'config.json')
 
 const USAGE = `Usage:
-  node src/cli.ts fetch  [--sources hn,reddit,github,producthunt,stackexchange,rss] [--days N] [--out signals.jsonl] [--config config.json]
+  node src/cli.ts fetch  [--sources hn,reddit,github,producthunt,stackexchange,discourse,rss] [--days N] [--out signals.jsonl] [--config config.json]
   node src/cli.ts export --out analyst-input.jsonl [--context-out competition.jsonl] [--days N] [--limit N] [--from signals.jsonl] [--config config.json]
 
 fetch  stores signals in MongoDB (MONGODB_URI, MONGODB_DB), or in a JSONL file with --out.
