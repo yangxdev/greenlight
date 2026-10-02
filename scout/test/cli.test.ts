@@ -141,16 +141,35 @@ describe('scout export', () => {
     const out = join(dir, 'analyst.jsonl')
     await main(['fetch', '--out', raw, '--config', await redditReadyConfig()], deps({ env: REDDIT_ENV }))
     const d = deps()
-    expect(await main(['export', '--from', raw, '--out', out, '--limit', '10'], d)).toBe(0)
+    expect(await main(['export', '--from', raw, '--out', out, '--limit', '6'], d)).toBe(0)
 
     const ranked = await readJsonl<RankedSignal>(out)
-    expect(ranked).toHaveLength(10)
+    expect(ranked).toHaveLength(6)
     expect(ranked.map((s) => s.rank)).toEqual([...ranked.map((s) => s.rank)].sort((a, b) => b - a))
     expect(ranked.every((s) => typeof s.painScore === 'number' && Array.isArray(s.alsoSeenIn))).toBe(true)
     // The invoice tool was posted on HN and Reddit; it should come out as one merged signal.
     const invoice = ranked.find((s) => s.link === 'https://example.com/invoices')
     expect(invoice?.alsoSeenIn).toHaveLength(1)
-    expect(d.logs.at(-1)).toMatch(/^exported 10 of \d+ signals from the last 7 days/)
+    expect(d.logs.at(-1)).toMatch(/^exported 6 of \d+ signals from the last 7 days/)
+  })
+
+  it('keeps launches and new projects out of the Analyst export and writes them to the competition file', async () => {
+    const raw = join(dir, 'signals.jsonl')
+    const out = join(dir, 'analyst.jsonl')
+    const competition = join(dir, 'competition.jsonl')
+    await main(['fetch', '--out', raw, '--config', await redditReadyConfig()], deps({ env: REDDIT_ENV }))
+    const all = await readJsonl<Signal>(raw)
+    const d = deps()
+    expect(await main(['export', '--from', raw, '--out', out, '--context-out', competition], d)).toBe(0)
+
+    const ranked = await readJsonl<RankedSignal>(out)
+    const context = await readJsonl<Signal>(competition)
+    expect(ranked.some((s) => s.source === 'github' || s.source === 'producthunt')).toBe(false)
+    expect(context.length).toBe(all.filter((s) => s.source === 'github' || s.source === 'producthunt').length)
+    expect(context.every((s) => s.source === 'github' || s.source === 'producthunt')).toBe(true)
+    const engagement = context.map((s) => s.score + 2 * s.comments)
+    expect(engagement).toEqual([...engagement].sort((a, b) => b - a))
+    expect(d.logs.at(-1)).toMatch(/launches and new projects \(producthunt\/github\) kept out as competition context in /)
   })
 
   it('reads from the store when no --from is given', async () => {

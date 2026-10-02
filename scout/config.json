@@ -48,9 +48,9 @@
     "limit": 30
   },
   "stackexchange": {
-    "_comment": "API site names (softwarerecs = softwarerecs.stackexchange.com). Both sites are mostly people asking whether a tool exists.",
+    "_comment": "API site names (softwarerecs = softwarerecs.stackexchange.com). Software Recommendations and Web Applications are mostly people asking whether a tool exists; the support sites (Super User, Ask Ubuntu, Apple, Android) only reach the Analyst with a pain phrase (export.dropWithoutPain).",
     "enabled": true,
-    "sites": ["softwarerecs", "webapps"],
+    "sites": ["softwarerecs", "webapps", "superuser", "askubuntu", "apple", "android"],
     "minScore": 0,
     "pageSize": 100
   },
@@ -98,7 +98,17 @@
     "_questionChannels": "Where people ask for tools or describe problems: ranked up by questionBoost (about two pain phrases' worth). \"source\" or \"source:channel\".",
     "questionChannels": ["hn:ask_hn", "hn:ask_hn_comment", "stackexchange", "reddit:SomebodyMakeThis", "reddit:AppIdeas"],
     "questionBoost": 0.25,
-    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement; Ask HN comments without one are mostly tool recommendations.",
-    "dropWithoutPain": ["hn:story", "hn:ask_hn_comment"]
+    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement; Ask HN comments without one are mostly tool recommendations; the support sites are mostly one-off troubleshooting.",
+    "dropWithoutPain": [
+      "hn:story",
+      "hn:ask_hn_comment",
+      "stackexchange:superuser",
+      "stackexchange:askubuntu",
+      "stackexchange:apple",
+      "stackexchange:android"
+    ],
+    "_contextSources": "Launches and new projects: evidence of competition, not of pain, so they don't take the Analyst's slots. export --context-out writes them to a competition file that the Analyst and Critic search.",
+    "contextSources": ["producthunt", "github"],
+    "contextLimit": 300
   }
 }

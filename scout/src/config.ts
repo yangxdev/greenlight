@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises'
-import { SOURCE_NAMES, type FeedConfig, type ScoutConfig } from './types.ts'
+import { SOURCE_NAMES, type FeedConfig, type ScoutConfig, type SourceName } from './types.ts'
 
 type Json = unknown
 
@@ -38,6 +38,15 @@ function channelPatterns(value: Json, path: string): string[] {
       throw new ConfigError(`${path}[${i}]: "${pattern}" must be "source" or "source:channel" (sources: ${SOURCE_NAMES.join(', ')})`)
     }
     return pattern
+  })
+}
+
+function sourceNames(value: Json, path: string): SourceName[] {
+  return strings(value, path).map((name, i) => {
+    if (!(SOURCE_NAMES as readonly string[]).includes(name)) {
+      throw new ConfigError(`${path}[${i}]: "${name}" is not a source (sources: ${SOURCE_NAMES.join(', ')})`)
+    }
+    return name as SourceName
   })
 }
 
@@ -129,6 +138,8 @@ export function parseConfig(raw: Json): ScoutConfig {
       questionChannels: channelPatterns(exp.questionChannels, 'export.questionChannels'),
       questionBoost: num(exp.questionBoost, 'export.questionBoost'),
       dropWithoutPain: channelPatterns(exp.dropWithoutPain, 'export.dropWithoutPain'),
+      contextSources: sourceNames(exp.contextSources, 'export.contextSources'),
+      contextLimit: num(exp.contextLimit, 'export.contextLimit', 1),
     },
   }
 }

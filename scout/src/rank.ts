@@ -81,6 +81,18 @@ export function sourcePercentiles(signals: Signal[]): Map<string, number> {
 }
 
 /**
+ * Launches and new projects for the competition file: most engaged first, merged by link, text cut like the export.
+ * Not ranked for pain, because they rarely state one.
+ */
+export function contextSignals(signals: Signal[], options: { limit: number; maxTextLength: number }): Signal[] {
+  const byLink = new Map<string, Signal>()
+  for (const s of [...signals].sort((a, b) => engagement(b) - engagement(a) || b.createdAt.localeCompare(a.createdAt))) {
+    if (!byLink.has(s.link)) byLink.set(s.link, s)
+  }
+  return [...byLink.values()].slice(0, options.limit).map((s) => ({ ...s, text: truncate(s.text, options.maxTextLength) }))
+}
+
+/**
  * Drop `dropWithoutPain` noise, rank, merge cross-source duplicates, and pick at most `limit` signals with no
  * source taking more than `maxSharePerSource` of the slots (unless the other sources run out).
  */

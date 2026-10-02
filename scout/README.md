@@ -22,7 +22,7 @@ Node 22.18+ runs the TypeScript directly, so there is no build step.
 | `reddit` | `oauth.reddit.com/r/<sub>/top?t=day` for each subreddit in `config.json` | `REDDIT_CLIENT_ID` + `REDDIT_CLIENT_SECRET` (app-only OAuth), which need Reddit's approval (see below) | Skipped, not failed, without credentials. One failing subreddit is skipped |
 | `github` | Search API: repos created in the last `createdWithinDays` with ≥ `minStars` | `GITHUB_TOKEN` (the workflow's own) | Stands in for "trending", which has no API |
 | `producthunt` | GraphQL API (votes, comments) | `PRODUCTHUNT_TOKEN` (developer token) | Falls back to the public Atom feed (no engagement numbers) |
-| `stackexchange` | API `/questions` (newest, with body) for each site in `config.json`: `softwarerecs`, `webapps` | none; optional `STACKEXCHANGE_KEY` | Questions are people asking whether a tool exists. Closed and downvoted questions are dropped; `comments` counts answers. Without a key the quota is 300 requests a day per IP, shared with everyone on the same GitHub runner IP. One failing site is skipped |
+| `stackexchange` | API `/questions` (newest, with body) for each site in `config.json`: `softwarerecs`, `webapps`, `superuser`, `askubuntu`, `apple`, `android` | none; optional `STACKEXCHANGE_KEY` | Software Recommendations and Web Applications are people asking whether a tool exists; the support sites only reach the Analyst with a pain phrase. Closed and downvoted questions are dropped; `comments` counts answers. Without a key the quota is 300 requests a day per IP, shared with everyone on the same GitHub runner IP. One failing site is skipped |
 | `rss` | Any RSS 2.0 / RSS 1.0 / Atom feed in `config.json` | none | One failing feed is skipped |
 
 A source that fails is logged as a warning and the run continues. The run only fails when every source fails.
@@ -74,8 +74,12 @@ Atlas M0's 512 MB.
 
 ## Export for the Analyst
 
-`export` takes the last `export.days` (7) of signals, leaves out `dropWithoutPain` channels (plain HN news `hn:story`
-and Ask HN replies `hn:ask_hn_comment`) that contain no pain phrase, and ranks the rest:
+`export` takes the last `export.days` (7) of signals and sets aside `contextSources` (Product Hunt launches and new
+GitHub projects): they show what people build, not what they struggle with, so they don't take the Analyst's slots.
+With `--context-out` they go to a separate competition file (at most `contextLimit`, 300, most engaged first) that the
+Analyst and Critic search rather than read. Of the rest, it leaves out `dropWithoutPain` channels (plain HN news
+`hn:story`, Ask HN replies `hn:ask_hn_comment`, and the Stack Exchange support sites) that contain no pain phrase,
+and ranks what remains:
 - 60% engagement percentile within the signal's own source (comments count double),
 - 40% `painPhrases` found in title and text (capped at 3),
 - +`questionBoost` (0.25, about two pain phrases) for `questionChannels`, where people ask for tools or describe

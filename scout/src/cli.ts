@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { loadConfig } from './config.ts'
-import { isDroppedNoise, rankSignals } from './rank.ts'
+import { contextSignals, isDroppedNoise, rankSignals } from './rank.ts'
 import { SOURCES } from './sources/index.ts'
 import { dedupeById, openMongoStore, readJsonl, writeJsonl, type Store } from './store.ts'
 import { SOURCE_NAMES, type FetchContext, type Signal, type SourceName } from './types.ts'
@@ -21,11 +21,12 @@ const DEFAULT_CONFIG = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'c
 
 const USAGE = `Usage:
   node src/cli.ts fetch  [--sources hn,reddit,github,producthunt,stackexchange,rss] [--days N] [--out signals.jsonl] [--config config.json]
-  node src/cli.ts export --out analyst-input.jsonl [--days N] [--limit N] [--from signals.jsonl] [--config config.json]
+  node src/cli.ts export --out analyst-input.jsonl [--context-out competition.jsonl] [--days N] [--limit N] [--from signals.jsonl] [--config config.json]
 
 fetch  stores signals in MongoDB (MONGODB_URI, MONGODB_DB), or in a JSONL file with --out.
        --days N looks back N days instead of lookbackHours, for a one-off backfill.
-export ranks recent signals for the Analyst, from MongoDB or from a JSONL file with --from.`
+export ranks recent signals for the Analyst, from MongoDB or from a JSONL file with --from. Launches and new
+       projects (export.contextSources) stay out of it; --context-out writes them to a separate competition file.`
 
 class UsageError extends Error {}
 
@@ -123,6 +124,7 @@ async function exportCommand(args: string[], deps: Deps): Promise<number> {
       from: { type: 'string' },
       days: { type: 'string' },
       limit: { type: 'string' },
+      'context-out': { type: 'string' },
     },
     strict: true,
   })
@@ -155,14 +157,30 @@ async function exportCommand(args: string[], deps: Deps): Promise<number> {
     questionBoost: config.export.questionBoost,
     dropWithoutPain: config.export.dropWithoutPain,
   }
-  const ranked = rankSignals(signals, rankOptions)
-  const noise = signals.filter((s) => isDroppedNoise(s, rankOptions)).length
+  const contextSources = config.export.contextSources
+  const isContext = (s: Signal) => contextSources.includes(s.source)
+  const problems = signals.filter((s) => !isContext(s))
+  const ranked = rankSignals(problems, rankOptions)
+  const noise = problems.filter((s) => isDroppedNoise(s, rankOptions)).length
   await writeJsonl(values.out, ranked)
 
-  const bySource = SOURCE_NAMES.map((name) => `${name} ${ranked.filter((s) => s.source === name).length}`).join(', ')
+  let contextNote = ''
+  const contextOut = values['context-out']
+  if (contextSources.length > 0) {
+    const context = contextSignals(signals.filter(isContext), {
+      limit: config.export.contextLimit,
+      maxTextLength: config.export.maxTextLength,
+    })
+    if (contextOut) await writeJsonl(contextOut, context)
+    contextNote = `; ${context.length} launches and new projects (${contextSources.join('/')}) kept out as competition context${contextOut ? ` in ${contextOut}` : ''}`
+  }
+
+  const bySource = SOURCE_NAMES.filter((name) => !contextSources.includes(name))
+    .map((name) => `${name} ${ranked.filter((s) => s.source === name).length}`)
+    .join(', ')
   const approxTokens = Math.round(ranked.reduce((n, s) => n + JSON.stringify(s).length, 0) / 4)
   const skipped = noise > 0 ? `; ${noise} skipped as ${config.export.dropWithoutPain.join('/')} without a pain phrase` : ''
-  const summary = `exported ${ranked.length} of ${signals.length} signals from the last ${days} days (${bySource}${skipped}), about ${approxTokens} tokens, to ${values.out}`
+  const summary = `exported ${ranked.length} of ${problems.length} signals from the last ${days} days (${bySource}${skipped}), about ${approxTokens} tokens, to ${values.out}${contextNote}`
   deps.log(summary)
   await stepSummary(deps, `### Scout export\n\n${summary}\n`)
   return 0

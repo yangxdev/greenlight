@@ -75,6 +75,13 @@ export interface ScoutConfig {
     questionChannels: string[]
     questionBoost: number
     dropWithoutPain: string[]
+    /**
+     * Sources that show what people build and launch, not what they struggle with. They never take the Analyst's
+     * slots; `export --context-out` writes them to a separate file the Analyst and Critic search for competition.
+     */
+    contextSources: SourceName[]
+    /** At most this many context items, most engaged first. The file is searched, not read whole. */
+    contextLimit: number
   }
 }
 
