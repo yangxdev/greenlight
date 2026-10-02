@@ -70,6 +70,9 @@ jobs:
           if not project or not project["field"]:
               sys.exit(f"::error::Project {number} of {owner}, or its Status field, was not found")
           options = {o["name"]: o["id"] for o in project["field"]["options"]}
+          if any(item["content"] is None for item in project["items"]["nodes"]):
+              sys.exit("::error::PROJECT_TOKEN can see the board but not the issues on it, so it can't read this "
+                       "repository. Use a classic token with the project scope (README, Project board setup).")
           on_board = {
               item["content"]["number"]: item
               for item in project["items"]["nodes"]
