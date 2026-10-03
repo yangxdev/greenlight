@@ -73,7 +73,7 @@ jobs:
           options = {o["name"]: o["id"] for o in project["field"]["options"]}
           if any(item["content"] is None for item in project["items"]["nodes"]):
               sys.exit("::error::PROJECT_TOKEN can see the board but not the issues on it, so it can't read this "
-                       "repository. A private repository needs the repo scope next to project (README, Project board "
+                       "repository. A private repository needs the repo scope next to project (docs/SETUP.md, Project board "
                        "setup).")
           on_board = {
               item["content"]["number"]: item
@@ -94,7 +94,7 @@ jobs:
               if state is None:
                   continue  # not an idea (e.g. the weekly reports issue): left as it is
               if state not in options:
-                  print(f"::warning::The board has no '{state}' Status option (README, Project board setup)")
+                  print(f"::warning::The board has no '{state}' Status option (docs/SETUP.md, Project board setup)")
                   continue
               item = on_board.get(issue["number"])
               if item is None:
