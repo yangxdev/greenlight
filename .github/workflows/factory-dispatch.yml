@@ -30,6 +30,8 @@ jobs:
     steps:
       - name: Find product repo
         id: repo
+        env:
+          TITLE: ${{ github.event.issue.title }}
         run: |
           # Only the workflow bot's or a collaborator's marker counts: anyone can comment on a public issue.
           full=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
@@ -44,7 +46,12 @@ jobs:
           echo "full=$full" >> "$GITHUB_OUTPUT"
           # A change builds its spec, recorded by the Architect on this issue.
           change=""
-          if gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx change; then
+          # Same test as the Architect's: the title, the `change` label or a sub-issue parent.
+          is_change=false
+          if grep -qiE '^\[change\]' <<<"$TITLE"; then is_change=true; fi
+          if gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx change; then is_change=true; fi
+          if gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/parent" --jq .number >/dev/null 2>&1; then is_change=true; fi
+          if [ "$is_change" = true ]; then
             change=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
               --jq '.[] | select(.user.login == "github-actions[bot]" or .author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | .body' \
               | grep -oE 'greenlight:change=changes/[0-9]+\.md' | tail -n1 | cut -d= -f2 || true)

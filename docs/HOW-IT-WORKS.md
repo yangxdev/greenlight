@@ -168,7 +168,7 @@ Changes use the same labels from `approved` to `building`, then end as `shipped`
 | `live` | Publisher | Deployed to `<name>.<you>.workers.dev` and `/api/health` answered `{ ok: true }` |
 | `stuck` | any workflow | Automation gave up. The issue comment links the failed run or PR |
 | `archived` | you · Observer suggestion | Dropped or retired. Close the issue too |
-| `change` | Change form · dashboard · Observer | Not a state: marks a change to a live product (a sub-issue of its idea issue). Kept for its whole life; with no state label it waits for your `approved` |
+| `change` | Change form · dashboard · Observer | Not a state: marks a change to a live product (a sub-issue of its idea issue). With no state label it waits for your `approved`. Swapping it for `approved` is fine: the workflows also recognise a change by its `[change]` title or its parent issue, and put the label back |
 | `shipped` | Publisher | A change that was built, merged and deployed. The issue is closed |
 
 Retry anything by removing and re-adding the gate label (`approved` or `blueprint-ok`). A stuck PR can be fixed by
