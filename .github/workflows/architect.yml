@@ -69,13 +69,20 @@ jobs:
         id: kind
         env:
           GH_TOKEN: ${{ github.token }}
+          TITLE: ${{ github.event.issue.title }}
         run: |
-          if ! gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx change; then
+          # A change is told apart by its title ("[change] …"), its `change` label or a sub-issue parent, any one of
+          # them: people swap labels (`change` for `approved`), and a change must never be scaffolded as a new product.
+          parent=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/parent" --jq .number 2>/dev/null || true)
+          is_change=false
+          if grep -qiE '^\[change\]' <<<"$TITLE"; then is_change=true; fi
+          if gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx change; then is_change=true; fi
+          if [ -n "$parent" ]; then is_change=true; fi
+          if [ "$is_change" != true ]; then
             { echo "kind=idea"; echo "spec=blueprint.md"; echo "parent="; } >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # The product's idea issue: the sub-issue parent, else the dashboard's marker, else the Change form's field.
-          parent=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/parent" --jq .number 2>/dev/null || true)
           if [ -z "$parent" ]; then
             body=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
             parent=$(grep -oE 'greenlight:parent=[0-9]+' <<<"$body" | head -n1 | cut -d= -f2 || true)
@@ -501,8 +508,11 @@ jobs:
           EOF
           )
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body "$body"
+          kind_label=()
+          # Put the kind label back if it was swapped away, so the board and the dashboard keep it as a change.
+          if [ "$KIND" = change ]; then kind_label=(--add-label change); fi
           gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" \
-            --remove-label approved --remove-label idea --remove-label stuck --add-label blueprint-ready
+            --remove-label approved --remove-label idea --remove-label stuck --add-label blueprint-ready "${kind_label[@]}"
 
   report-failure:
     needs: [scaffold, blueprint, review, publish]
