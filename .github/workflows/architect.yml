@@ -304,7 +304,7 @@ jobs:
 
             Output: write product/change.md. Do not create, edit or delete any other file.
           claude_args: >-
-            --max-turns ${{ vars.ARCHITECT_MAX_TURNS || '20' }}
+            --max-turns ${{ vars.ARCHITECT_CHANGE_MAX_TURNS || '40' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
 
@@ -377,7 +377,7 @@ jobs:
 
             Edit only product/${{ needs.scaffold.outputs.spec }}, then return the structured result.
           claude_args: >-
-            --max-turns ${{ vars.REVIEWER_MAX_TURNS || '20' }}
+            --max-turns ${{ needs.scaffold.outputs.kind == 'change' && (vars.REVIEWER_CHANGE_MAX_TURNS || '30') || (vars.REVIEWER_MAX_TURNS || '20') }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
             --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","changes","concerns"],"properties":{"verdict":{"type":"string","enum":["ready","needs-owner"]},"changes":{"type":"array","maxItems":15,"items":{"type":"string","maxLength":300}},"concerns":{"type":"array","maxItems":10,"items":{"type":"string","maxLength":300}}}}'
