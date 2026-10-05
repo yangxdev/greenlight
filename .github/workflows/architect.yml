@@ -457,7 +457,8 @@ jobs:
           git config --global user.name "greenlight-architect"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${FULL}.git" product
-          if [ "$KIND" = change ]; then dest="changes/$ISSUE.md"; message="docs: change spec #$ISSUE"; else dest="blueprint.md"; message="docs: blueprint"; fi
+          # [skip ci]: a spec is documentation, so its push must not redeploy the product's unchanged code.
+          if [ "$KIND" = change ]; then dest="changes/$ISSUE.md"; message="docs: change spec #$ISSUE [skip ci]"; else dest="blueprint.md"; message="docs: blueprint [skip ci]"; fi
           mkdir -p "product/$(dirname "$dest")"
           cp "$RUNNER_TEMP/blueprint/spec.md" "product/$dest"
           cd product
