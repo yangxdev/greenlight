@@ -38,7 +38,7 @@ src/
   components/shell/   # app layout: AppShell, AppHeader, ViewHeader, AppFooter
                       # page layout: SiteHeader, Hero (+ Accent), Section (numbered rail), SiteFooter
   components/ui/      # house-style primitives: Button, IconButton, Checkbox, Field, Segmented, RuledList/RuledItem,
-                      #   CellGrid/Cell/Stat, DetailList, Pane, Drawer, StatusDot, Note, EmptyState, Skeleton, Mark,
+                      #   CellGrid/Cell/Stat, DetailList, Pane, Drawer, StatusDot, TextArea, Note, EmptyState, Skeleton, Mark,
                       #   ThemeToggle, and styles.ts
                       #   (buttonClass, optionClass, labelClass, indexClass, chipClass, linkClass, monoClass, ...)
   components/         # other shared presentational components (no Redux inside)
@@ -179,10 +179,10 @@ When in doubt it is an `app`. A product that would need its hero scrolled past e
   Many same-kind objects to scan at once (projects, devices, accounts): a `CellGrid` of tiles, each a link or button
   with a mono meta line, a title and one `StatusDot`.
 - Regions of an app view: `Pane` (a hairline box with a mono label strip; `flush` for a list inside). A detail or a
-  form over the view: `Drawer`. Status: `StatusDot` (success, warning, danger, idle, attention), always with a label.
+  form over the view: `Drawer`. Status: `StatusDot` (success, active, warning, danger, idle, attention), always with a label.
 - Label/value details: `DetailList` (ruled, the label column on the `zone` band; pass `onZone` inside a zone section).
 - Filters and tabs: `Segmented` (or `optionClass` for links). Tags: `chipClass`. Checkboxes: `Checkbox`.
-- Forms: `Field` (mono label above, hint below, error as `role="alert"`).
+- Forms: `Field` and `TextArea` (mono label above, hint below, error as `role="alert"`).
 - Empty states: `EmptyState` (a dashed ruled box, a title, one line, one action). Loading: `Skeleton` shaped like the
   content.
 - Caveats, sources, "not verified yet": `Note` right under the thing it qualifies.

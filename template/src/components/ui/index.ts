@@ -12,6 +12,7 @@ export { RuledItem, RuledList } from './RuledList.tsx';
 export { Segmented, type SegmentedOption } from './Segmented.tsx';
 export { Skeleton } from './Skeleton.tsx';
 export { StatusDot, type StatusTone } from './StatusDot.tsx';
+export { TextArea } from './TextArea.tsx';
 export { ThemeToggle } from './ThemeToggle.tsx';
 export {
   buttonClass,

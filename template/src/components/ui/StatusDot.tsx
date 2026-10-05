@@ -1,9 +1,11 @@
 import { cn } from '../../lib/cn.ts';
 
-export type StatusTone = 'success' | 'warning' | 'danger' | 'idle' | 'attention';
+export type StatusTone = 'success' | 'active' | 'warning' | 'danger' | 'idle' | 'attention';
 
 const TONES: Record<StatusTone, string> = {
   success: 'bg-success',
+  // Working right now: neutral ink, because running is neither good nor bad news.
+  active: 'bg-ink',
   warning: 'bg-warning',
   danger: 'bg-danger',
   idle: 'bg-line-strong',
