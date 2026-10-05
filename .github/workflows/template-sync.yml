@@ -1,0 +1,121 @@
+# Template sync: brings every live product's template-owned files up to date with template/, as a pull request on
+# each product repo. Products are snapshots; this is how template fixes reach them. No AI, and no product code runs:
+# .github/scripts/template_sync.py compares and copies files, git pushes them.
+#
+# A product's copy is updated only if the product never changed it (it matches some version of the template). A copy
+# the product changed is kept and listed in the pull request. The product's own Inspector checks the pull request; it
+# never merges it, because only Factory branches drive the pipeline, so merging stays yours. Merging deploys.
+#
+# Needs GREENLIGHT_TOKEN with Contents, Pull requests and Workflows (write) on the product repos: the sync can touch
+# .github/workflows/.
+name: Template sync
+
+on:
+  push:
+    branches: [main]
+    paths: ["template/**"]
+  workflow_dispatch:
+    inputs:
+      product:
+        description: One product repo (owner/name). Empty means every live product.
+        required: false
+
+concurrency:
+  group: template-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  issues: read
+
+env:
+  BRANCH: greenlight/template-sync
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every template version, so a file that is merely behind is told apart from one the product changed.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Template sync tests
+        run: python3 -m unittest discover -s .github/scripts
+
+      - name: List the products
+        id: products
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ONE: ${{ inputs.product }}
+        run: |
+          if [ -n "$ONE" ]; then
+            [[ "$ONE" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] || { echo "::error::'$ONE' is not owner/name"; exit 1; }
+            echo "$ONE" > "$RUNNER_TEMP/products.txt"
+          else
+            : > "$RUNNER_TEMP/products.txt"
+            # Live ideas; the product repo comes from the Architect's marker (trusted commenters only).
+            for n in $(gh issue list --repo "$GITHUB_REPOSITORY" --label live --state open --limit 200 --json number --jq '.[].number'); do
+              gh api "repos/$GITHUB_REPOSITORY/issues/$n/comments" --paginate \
+                --jq '.[] | select(.user.login == "github-actions[bot]" or .author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | .body' \
+                | grep -oE 'greenlight:repo=[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | tail -n1 | cut -d= -f2 >> "$RUNNER_TEMP/products.txt" || true
+            done
+          fi
+          sort -u -o "$RUNNER_TEMP/products.txt" "$RUNNER_TEMP/products.txt"
+          echo "Products:"; cat "$RUNNER_TEMP/products.txt"
+
+      - name: Open or update a sync pull request per product
+        env:
+          GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+        run: |
+          set -euo pipefail
+          [ -n "$GH_TOKEN" ] || { echo "::error::Missing repository secret GREENLIGHT_TOKEN"; exit 1; }
+          git config --global user.name "greenlight-template-sync"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          summary="$GITHUB_STEP_SUMMARY"
+          echo "| Product | Result |" >> "$summary"
+          echo "|---|---|" >> "$summary"
+          failed=0
+          while read -r full; do
+            [ -n "$full" ] || continue
+            dir="$RUNNER_TEMP/p/${full//\//_}"
+            remote="https://x-access-token:${GH_TOKEN}@github.com/${full}.git"
+            if ! git clone -q --depth 1 "$remote" "$dir"; then
+              echo "| $full | could not clone |" >> "$summary"; failed=1; continue
+            fi
+            if ! out=$(python3 .github/scripts/template_sync.py --greenlight . --product "$dir" \
+              --name "${full#*/}" --owner "${full%%/*}" --head "$GITHUB_SHA" --repo "$GITHUB_REPOSITORY" \
+              --apply --report "$RUNNER_TEMP/report.md"); then
+              echo "| $full | sync script failed (see the log) |" >> "$summary"; failed=1; continue
+            fi
+            echo "$full: $out"
+            existing=$(gh pr list --repo "$full" --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+            if [ "$(jq -r .changes <<<"$out")" != "true" ]; then
+              echo "| $full | up to date ($(jq -r '.conflicts | length' <<<"$out") changed on both sides) |" >> "$summary"
+              # A sync PR left open from an earlier template change is moot now.
+              if [ -n "$existing" ]; then
+                gh pr close "$existing" --repo "$full" --delete-branch --comment "Up to date with the template now; nothing left to sync."
+              fi
+              continue
+            fi
+            (
+              cd "$dir"
+              git switch -q -c "$BRANCH"
+              git add -A
+              git commit -q -m "chore: template sync to ${GITHUB_SHA:0:7}" -m "From ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+              # The branch is ours alone: each run replaces it with one commit on the product's current main.
+              git -c core.hooksPath=/dev/null push -q -f "$remote" "HEAD:refs/heads/$BRANCH"
+            )
+            if [ -n "$existing" ]; then
+              gh pr edit "$existing" --repo "$full" --title "Template sync to ${GITHUB_SHA:0:7}" \
+                --body-file "$RUNNER_TEMP/report.md"
+              echo "| $full | updated #$existing |" >> "$summary"
+            else
+              url=$(gh pr create --repo "$full" --base main --head "$BRANCH" \
+                --title "Template sync to ${GITHUB_SHA:0:7}" --body-file "$RUNNER_TEMP/report.md")
+              echo "| $full | opened $url |" >> "$summary"
+            fi
+          done < "$RUNNER_TEMP/products.txt"
+          exit "$failed"
