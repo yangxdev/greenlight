@@ -35,9 +35,11 @@ src/
   app/hooks.ts        # useAppDispatch / useAppSelector (always use these)
   app/site.ts         # SITE_NAME, SITE_TAG, SITE_DESCRIPTION: identity, page title and link previews
   features/<name>/    # one folder per feature: <name>Slice.ts, components, <name>.test.ts(x)
-  components/shell/   # page structure: SiteHeader, Hero (+ Accent), Section (numbered rail), SiteFooter
+  components/shell/   # app layout: AppShell, AppHeader, ViewHeader, AppFooter
+                      # page layout: SiteHeader, Hero (+ Accent), Section (numbered rail), SiteFooter
   components/ui/      # house-style primitives: Button, IconButton, Checkbox, Field, Segmented, RuledList/RuledItem,
-                      #   CellGrid/Cell/Stat, DetailList, Note, EmptyState, Skeleton, Mark, ThemeToggle, and styles.ts
+                      #   CellGrid/Cell/Stat, DetailList, Pane, Drawer, StatusDot, Note, EmptyState, Skeleton, Mark,
+                      #   ThemeToggle, and styles.ts
                       #   (buttonClass, optionClass, labelClass, indexClass, chipClass, linkClass, monoClass, ...)
   components/         # other shared presentational components (no Redux inside)
   lib/                # framework-free helpers: api.ts fetch wrapper, theme.ts, cn.ts, formatting, ...
@@ -71,36 +73,61 @@ build-report.md       # written by the Factory at the end of a build
 
 ## Look & feel
 
-Products are siblings of the owner's own site, yangxdev.com, which takes its structure from sakana.ai: a page reads
-like a **ruled document** (the way Japanese corporate sites are laid out), not like a template. White first, hairlines, square corners, mono for every label,
-one vermilion accent, numbered sections with a left rail. The tokens in `src/index.css` and the components in
-`src/components/ui/` and `src/components/shell/` encode all of it; `App.tsx` in the scaffold shows the anatomy. Build
-with them rather than around them. `npm run lint` runs a style guard (`scripts/check-style.ts`) that fails on the hard
-rules below.
+Products are siblings of the owner's own site, yangxdev.com, which takes its structure from sakana.ai: white first,
+hairlines, square corners, mono for every label, one vermilion accent. The tokens in `src/index.css` and the
+components in `src/components/ui/` and `src/components/shell/` encode all of it. Build with them rather than around
+them. `npm run lint` runs a style guard (`scripts/check-style.ts`) that fails on the hard rules below.
 
 **Why products used to look generated, and what replaces it**
 
 | The template look (don't)                                   | The house look (do)                                                      |
 | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
-| A centred narrow column of rounded cards with soft shadows  | Full-width sections on one container, each with a numbered rail (`Section`) |
+| A centred narrow column of rounded cards with soft shadows  | Full-width content on a hairline grid: `Pane`s in an app, ruled `Section`s on a page |
 | Cards stacked with gaps                                     | Rows separated by hairlines (`RuledList`), cells sharing borders (`CellGrid`) |
-| Sticky header with blur, product name in plain text         | Solid header: mark, lowercase name, mono tag, mono nav (`SiteHeader`)    |
+| Sticky header with blur, product name in plain text         | Solid header: mark, lowercase name, mono tag, mono nav (`AppHeader`, `SiteHeader`) |
 | Accent-coloured pill buttons, rounded filter chips          | One square ink button; filters as mono words over a rule (`Segmented`)   |
 | Small uppercase sans captions, `text-sm` everywhere          | Uppercase mono labels (`labelClass`), a real type scale (`text-display` … `text-label`) |
-| Icons in circles, emoji, gradients, illustrations           | Words and numbers (`01`, `Stat`); the small vermilion `Mark` is the logo |
+| Icons in circles, emoji, gradients, illustrations           | Words and numbers (`01`, `Stat`, `StatusDot`); the small vermilion `Mark` is the logo |
 | Caveats in a banner                                         | Footnotes under the claim they qualify (`Note`)                          |
 | The Vite favicon                                            | The product's initial on vermilion (`public/favicon.svg`)                |
 
-**Anatomy of every product** (one screen or three, the same parts)
+**Two layouts.** The blueprint's Identity names one (`Layout: app` or `Layout: page`). Same tokens, same rules; they
+differ in what comes first on the screen.
 
-1. `SiteHeader`: the mark, `SITE_NAME`, `SITE_TAG` in mono, optional mono nav (in-page anchors or the other screens).
-2. `Hero`: optional mono eyebrow, a `text-display` headline with at most one word in `Accent`, a one-sentence lede,
-   one `primary` action (plus at most one `ghost`), notes under it. For a tool whose job starts immediately, keep the
-   hero short and put the tool in the first section right under it, not behind a click.
-3. `Section`s numbered `01`, `02`, … in page order, each with a one- or two-word rail `label`. The tool itself is
-   section `01`. Alternate `tone="zone"` for a section that should stand apart, never two zones in a row.
-4. `SiteFooter`: mark, name, tag, a few mono links (source, "Suggest a change"), and `Note`s about the whole product
-   (what it stores, what it cannot do).
+- **`app` (the default): the product itself, right under the bar.** For anything people *use*: a tool, a tracker, a
+  dashboard, an editor, a calculator, a list they filter. No hero, no slogan, no numbered rail. The scaffold's
+  `App.tsx` shows it.
+  1. `AppShell` with an `AppHeader`: mark, `SITE_NAME`, `SITE_TAG`, the screens as mono tabs (max 3), at most one
+     action (e.g. "New …" or sign-in) and the theme switch. Optional `sidebar` for filters or saved things.
+  2. `ViewHeader` per screen: a plain `title` (the h1: "Projects", "Invoices", a record's name, never a slogan), a
+     `meta` line (counts, "Updated 12:04"), `actions` (one primary), and a `toolbar` (`Segmented` filters, search).
+  3. The working view, `px-edge py-6`: a grid of `Pane`s for a dashboard or a detail view, a `RuledList` for a list,
+     a `CellGrid` of tiles for many same-kind objects, the form itself for a calculator. Details and forms that
+     shouldn't leave the view open in a `Drawer`.
+  4. `AppFooter`: one hairline strip with a note (what it stores) and a few mono links (source, "Suggest a change").
+  The first screenshot of an app shows the tool working, so give its empty state one obvious action and seed nothing
+  fake.
+- **`page`: a ruled document, read top to bottom.** Only for products whose job is to be read once: a guide, an
+  explainer, a public log, a reference. This is the sakana.ai anatomy:
+  1. `SiteHeader`: the mark, `SITE_NAME`, `SITE_TAG` in mono, optional mono nav (in-page anchors or other screens).
+  2. `Hero`: optional mono eyebrow, a `text-display` headline with at most one word in `Accent`, a one-sentence lede,
+     one `primary` action (plus at most one `ghost`), notes under it.
+  3. `Section`s numbered `01`, `02`, … in page order, each with a one- or two-word rail `label`. Alternate
+     `tone="zone"` for a section that should stand apart, never two zones in a row.
+  4. `SiteFooter`: mark, name, tag, a few mono links, and `Note`s about the whole product.
+
+  ```tsx
+  <div className="min-h-dvh">
+    <SiteHeader nav={[{ href: '#list', label: 'List' }]} />
+    <main>
+      <Hero title={<>Switches worth <Accent>checking</Accent> again.</>} lede="…" />
+      <Section id="list" index="01" label="Checklist" title="Every switch">…</Section>
+    </main>
+    <SiteFooter>…</SiteFooter>
+  </div>
+  ```
+
+When in doubt it is an `app`. A product that would need its hero scrolled past every visit is an `app`.
 
 **Identity** (the blueprint's "Identity" section decides it; set it in the first UI task)
 
@@ -116,7 +143,8 @@ rules below.
 - **Light is the default** (even on a dark system); dark is one click away (`ThemeToggle`, remembered) and must look
   as good. Check every screen in both themes.
 - **One accent, 朱色 (`brand`), rationed to about eight appearances per scroll**: section indices and their short rule,
-  the `Mark`, the one `Accent` word, the selected option, the lit nav item, the focus outline. **Buttons are ink, not
+  the `Mark`, the one `Accent` word, the selected option, the lit nav item, the focus outline, and in an app the
+  thing that needs the person (`StatusDot tone="attention"`). **Buttons are ink, not
   brand.** Never decoration, never a second accent. `danger` / `warning` / `success` are for status only.
 - **Square corners everywhere.** Status dots are the only round element (`rounded-full`). There are no radius tokens:
   `rounded-md` produces nothing and the style guard rejects it.
@@ -125,11 +153,13 @@ rules below.
 - **Geist for reading, Geist Mono for structure**: every label, index, nav item, tag, chip, date, count, code, path and
   price is mono (`labelClass`, `indexClass`, `chipClass`, `monoClass`). Headings and body are Geist. No serif, no
   decorative fonts.
-- **Type scale**: `text-display` (hero, once), `text-h2` (section titles), `text-h3` (row and cell titles),
-  `text-lede`, `text-body`, `text-small`, `text-note`, `text-label`. Generous line height; text never sits on a grey
-  card.
-- **Layout**: one container (`containerClass`, `max-w-measure` inside `px-gutter`) for header, hero, sections and
-  footer, so their left edges line up. Content is left-aligned; nothing is centred except inside a control.
+- **Type scale**: `text-display` (a page's hero, once), `text-title` (an app view's h1), `text-h2` (section titles),
+  `text-h3` (row, cell and drawer titles), `text-lede`, `text-body`, `text-small`, `text-note`, `text-label`.
+  Generous line height; text never sits on a grey card.
+- **Layout**: in an `app`, everything sits on the `px-edge` padding, edge to edge (cap a form or prose at
+  `max-w-3xl`, not the whole view). On a `page`, one container (`containerClass`, `max-w-measure` inside
+  `px-gutter`) for header, hero, sections and footer, so their left edges line up. Content is left-aligned; nothing is
+  centred except inside a control.
 - **Never hardcode a colour, shadow or duration.** Use tokens: `bg-canvas`, `text-muted`, `border-line`,
   `duration-(--duration-hover)`, `ease-out-soft`. Tailwind's stock palette is removed (`bg-white`, `text-gray-500`,
   `bg-indigo-600` produce nothing). If a colour sits ON another colour it needs its own token (like `on-ink`); add it to
@@ -146,6 +176,10 @@ rules below.
 - Lists of things (items, results, settings, steps): `RuledList` + `RuledItem`, with an index, date or category in the
   mono `meta` column and one control in `aside`. Not cards.
 - Features, facts, prices: `CellGrid` with `Cell` (indexed `01`, `02`) or `Stat` (a big mono figure and a caption).
+  Many same-kind objects to scan at once (projects, devices, accounts): a `CellGrid` of tiles, each a link or button
+  with a mono meta line, a title and one `StatusDot`.
+- Regions of an app view: `Pane` (a hairline box with a mono label strip; `flush` for a list inside). A detail or a
+  form over the view: `Drawer`. Status: `StatusDot` (success, warning, danger, idle, attention), always with a label.
 - Label/value details: `DetailList` (ruled, the label column on the `zone` band; pass `onZone` inside a zone section).
 - Filters and tabs: `Segmented` (or `optionClass` for links). Tags: `chipClass`. Checkboxes: `Checkbox`.
 - Forms: `Field` (mono label above, hint below, error as `role="alert"`).
@@ -157,7 +191,8 @@ rules below.
   make that decision with a width breakpoint.
 - Category colours are allowed only when scanning by type is a real task: one family with the same lightness and
   chroma, evenly spaced hues, each ≥ 4.5:1 on `canvas`, never the danger hue. Define them as tokens in `index.css`.
-- Mobile first: no horizontal scroll at 320px (the rail folds into one line above the content by itself). Tabular
+- Mobile first: no horizontal scroll at 320px (the rail folds into one line above the content, the app's tabs drop
+  to a second row, panes stack). Tabular
   numbers (`<time>` or `.tnum`) for anything that lines up.
 
 **Voice**: plain and specific, like sakana.ai's product pages. Sentence case, no exclamation marks, no marketing

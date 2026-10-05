@@ -14,11 +14,17 @@ What v1 does, in 3–6 bullets, from the user's point of view. Screens (max 3) a
 ## Identity
 
 How the product looks and introduces itself (see the template's CLAUDE.md → "Look & feel").
+- **Layout:** `app` or `page`. `app` (the default) puts the working tool right under a compact bar: anything people
+  use, track, filter or come back to. `page` is a ruled document with a hero and numbered sections, only for a product
+  whose job is to be read: a guide, an explainer, a public log.
 - **Tag:** 2–4 lowercase words shown in mono next to the name, e.g. `privacy switch log`.
 - **Description:** one plain sentence for search results and link previews: what it does, for whom.
-- **Headline:** the hero's h1, real copy, with at most one word marked as the accent, e.g. `Switches worth *checking* again.`
-- **Sections:** the numbered sections in page order, each a one- or two-word rail label and what it holds, e.g.
-  `01 Checklist: the switches, filterable by platform`. The tool itself is `01`.
+- For `app`: **Screens:** each screen's tab label and its view title (a plain noun, not a slogan), then what its
+  view holds, e.g. `checklist · "Switches": the switches as ruled rows, filterable by platform; a Drawer for one
+  switch's steps`. Name the one primary action, if any.
+- For `page`: **Headline:** the hero's h1, real copy, with at most one word marked as the accent, e.g.
+  `Switches worth *checking* again.` **Sections:** the numbered sections in page order, each a one- or two-word rail
+  label and what it holds, e.g. `01 Checklist: the switches, filterable by platform`.
 
 ## Data model
 

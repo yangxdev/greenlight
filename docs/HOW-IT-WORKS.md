@@ -165,8 +165,9 @@ template/                   product skeleton copied into every new product repo
   README.md                 the product repo's front page: a skeleton the Factory fills; the Publisher adds link and screenshots
   src/index.css             house-style tokens (yangxdev.com / sakana.ai family): colours, type, spacing, motion
   scripts/check-style.ts    house-style guard in `npm run lint`: no rounded cards, shadows, gradients, blur or emoji
-  src/components/shell/     page structure: SiteHeader, Hero, Section (numbered rail), SiteFooter
-  src/components/ui/        Button, Segmented, RuledList, CellGrid, DetailList, Field, Note, Mark, ... + class strings
+  src/components/shell/     two layouts: app (AppShell, AppHeader, ViewHeader, AppFooter, the default) and page
+                            (SiteHeader, Hero, Section with its numbered rail, SiteFooter); the blueprint picks one
+  src/components/ui/        Button, Segmented, RuledList, CellGrid, DetailList, Pane, Drawer, StatusDot, Field, Note, ...
   src/ worker/ shared/      Vite + React + RTK + Tailwind + TS app, the /api Worker, shared types
   wrangler.jsonc            Cloudflare Worker with static assets (same shape as waypoint / yangxdev.com)
   .github/workflows/

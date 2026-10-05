@@ -79,5 +79,6 @@ export const linkClass =
   'text-ink underline decoration-line-strong underline-offset-4 transition-colors duration-(--duration-hover) ' +
   'ease-out-soft hover:text-brand hover:decoration-brand';
 
-/** Header, hero, sections and footer share one container, so their left edges line up at every width. */
+/** The `page` layout: header, hero, sections and footer share one container, so their left edges line up. An `app`
+ * uses `px-edge` instead and runs edge to edge. */
 export const containerClass = 'mx-auto w-full max-w-measure';
