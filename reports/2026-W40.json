@@ -1,0 +1,24 @@
+{
+  "week": "2026-W40",
+  "summary": "W40 (2026-09-28 to 2026-10-05): all three live products are up (probe uptime 100%: #5 5/5, #3 8/8, #1 15/15; healthy checks at report time). All were live under 2 weeks, so each is keep and it is too early to judge. Traffic is 0 visits for opt-out-log (0 last week too, likely not yet posted) and no data for agent-spend-cap and greenlight-status, which have no Web Analytics site. Pipeline: 3 ideas filed, 3 live, 0 stuck. Tokens are healthy (359 and 363 days left). The owner actions are to add the two missing analytics sites and post the links.",
+  "products": [
+    {
+      "issue": 5,
+      "verdict": "keep",
+      "reason": "Live since 2026-10-03, under 2 weeks, so too early to judge. Uptime is 100% (5/5 probes), latency 62 ms. No traffic data because no Web Analytics site exists. The label-source success metric is not in metrics.json.",
+      "suggestion": "Add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN in the product repo (or map it in observer/config.json)."
+    },
+    {
+      "issue": 3,
+      "verdict": "keep",
+      "reason": "Live since 2026-10-02, under 2 weeks, so too early to judge. Uptime is 100% (8/8 probes), latency 72 ms. No traffic data because no Web Analytics site exists, so the 200-visit target cannot be checked.",
+      "suggestion": "Add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN before posting the link to Hacker News and the Claude Code and Codex discussions."
+    },
+    {
+      "issue": 1,
+      "verdict": "keep",
+      "reason": "Live since 2026-10-02, under 2 weeks, so too early to judge. Uptime is 100% (15/15 probes), latency 70 ms. Visits are 0 this week and last, most likely because the link has not been posted. The archive rule starts counting 2 weeks after liveSince (from 2026-10-16).",
+      "suggestion": "Post the link in at least one Reachable-users community (two for the archive threshold to apply), then check visits against the 300-visit and 15% return-visitor target."
+    }
+  ]
+}
