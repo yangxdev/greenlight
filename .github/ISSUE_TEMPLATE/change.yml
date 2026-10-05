@@ -1,0 +1,36 @@
+name: Change
+description: Ask for a change to a live product. Label it "approved" when you want the Architect to spec it.
+title: "[change] "
+labels: ["change"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One change per issue, to one product. The Architect writes a short change spec (at most five tasks) on top of
+        the product's blueprint, and the Factory builds it on the existing repo. The product stays live meanwhile.
+        Add this issue as a sub-issue of the product's idea issue too, so it shows under it.
+  - type: input
+    id: product
+    attributes:
+      label: Product issue
+      description: The product's idea issue, e.g. #5.
+      placeholder: "#5"
+    validations:
+      required: true
+  - type: textarea
+    id: change
+    attributes:
+      label: What should change
+      description: What a user should see or be able to do afterwards. Concrete beats complete.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it solves, or the evidence (a report, a comment, a visit count).
+  - type: textarea
+    id: keep
+    attributes:
+      label: Must not change
+      description: What has to keep working exactly as it does.

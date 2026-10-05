@@ -24,7 +24,11 @@ the whole pipeline in 16 minutes of machine time.
    merges or sends it back for a fix, at most three rounds.
 7. **Publisher** (no AI) deploys to Cloudflare, smoke-tests it and puts the live link and screenshots in the README.
 8. **Observer** (weekly) reports uptime and visits with a keep, improve or archive verdict per product, which the next
-   Analyst run reads.
+   Analyst run reads. An `improve` verdict files a change request under the product's issue.
+9. **Changes** to a live product are sub-issues of its idea issue and go through the same two gates: the Architect
+   writes a change spec of at most five tasks against the product's code, the Factory builds it on the existing repo,
+   and the product stays live throughout. **Template sync** opens a pull request on every live product when the
+   template changes, updating the files the product never changed.
 
 Stages hand off through **markdown files and labels, not chat**: idea cards, blueprints, build reports and weekly
 reports, all in [templates/](templates). [compass.md](compass.md) holds the interests, stack, no-go list and the

@@ -97,7 +97,8 @@ override them there per product.
 
 ## 4. Create the labels
 
-Actions → **Setup labels** → *Run workflow*. It's safe to re-run.
+Actions → **Setup labels** → *Run workflow*. It's safe to re-run, and needed again after an update adds labels (the
+`change` and `shipped` labels came with changes to live products).
 
 ## 5. Create the Project board
 
@@ -105,8 +106,8 @@ Actions → **Setup labels** → *Run workflow*. It's safe to re-run.
    Status options: *Todo*, *In progress* and *Done*.
 2. Set the Status options before anything else, because the workflows below refer to them. Open the ⋯ menu on a
    column header (or the **Status** field in the project settings) and rename *Todo*, *In progress* and *Done* to
-   `idea`, `approved` and `blueprint-ready`. Then add `blueprint-ok`, `building`, `live`, `stuck` and `archived`, in
-   that order.
+   `idea`, `approved` and `blueprint-ready`. Then add `blueprint-ok`, `building`, `live`, `stuck`, `archived` and
+   `shipped` (changes that were deployed), in that order.
 3. Link the repo from the repo's side: the `greenlight` repo → **Projects** tab → **Link a project** → *Greenlight*.
    The board then shows up in the repo's Projects tab. (The project's own **Manage access** page is for people, not
    repos.)

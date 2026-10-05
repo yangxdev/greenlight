@@ -1,5 +1,6 @@
 # Factory dispatch: when an issue gets the "blueprint-ok" label, start the Factory in the
 # product repo (repository_dispatch), after checking that no other build is running.
+# For a change, the Factory gets the change spec's path (changes/<issue>.md) and reports to the change's issue.
 # No AI runs here.
 name: Factory dispatch
 
@@ -41,6 +42,20 @@ jobs:
             exit 1
           fi
           echo "full=$full" >> "$GITHUB_OUTPUT"
+          # A change builds its spec, recorded by the Architect on this issue.
+          change=""
+          if gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx change; then
+            change=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
+              --jq '.[] | select(.user.login == "github-actions[bot]" or .author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | .body' \
+              | grep -oE 'greenlight:change=changes/[0-9]+\.md' | tail -n1 | cut -d= -f2 || true)
+            if [ -z "$change" ]; then
+              gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+                --body "🏭 **Factory dispatch:** no change spec recorded on this issue. Run the Architect first (label \`approved\`)."
+              gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label blueprint-ok
+              exit 1
+            fi
+          fi
+          echo "change=$change" >> "$GITHUB_OUTPUT"
 
       - name: Enforce one build at a time
         id: slot
@@ -61,12 +76,14 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           FULL: ${{ steps.repo.outputs.full }}
+          CHANGE: ${{ steps.repo.outputs.change }}
         run: |
           [ -n "$GH_TOKEN" ] || { echo "::error::Missing repository secret GREENLIGHT_TOKEN"; exit 1; }
           gh api "repos/$FULL/dispatches" \
             -f event_type=greenlight-build \
             -f "client_payload[greenlight_repo]=$GITHUB_REPOSITORY" \
-            -f "client_payload[issue]=$ISSUE"
+            -f "client_payload[issue]=$ISSUE" \
+            -f "client_payload[change]=$CHANGE"
 
       - name: Move to "building"
         if: steps.slot.outputs.free == 'true'
