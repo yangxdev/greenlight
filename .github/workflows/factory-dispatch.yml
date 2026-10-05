@@ -57,6 +57,22 @@ jobs:
           fi
           echo "change=$change" >> "$GITHUB_OUTPUT"
 
+      - name: Check the product can build changes
+        if: steps.repo.outputs.change != ''
+        env:
+          PAT: ${{ secrets.GREENLIGHT_TOKEN }}
+          FULL: ${{ steps.repo.outputs.full }}
+        run: |
+          # A product whose Factory predates changes would ignore the spec and rebuild from blueprint.md. Its template
+          # sync pull request brings the new Factory; until it is merged, a change can't be built.
+          factory=$(GH_TOKEN="$PAT" gh api "repos/$FULL/contents/.github/workflows/factory.yml" --jq .content | base64 -d || true)
+          if ! grep -q 'client_payload.change' <<<"$factory"; then
+            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+              --body "🏭 **Factory dispatch:** ${FULL}'s Factory can't build changes yet. Merge its open **Template sync** pull request (https://github.com/${FULL}/pulls), then re-apply \`blueprint-ok\`."
+            gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label blueprint-ok
+            exit 1
+          fi
+
       - name: Enforce one build at a time
         id: slot
         run: |
