@@ -264,6 +264,12 @@ jobs:
           mkdir -p docs/screenshots
           # Screenshots are light only; drop dark ones an older Publisher committed.
           git rm -q --ignore-unmatch docs/screenshots/desktop-dark.png docs/screenshots/section-dark.png docs/screenshots/mobile-dark.png
+          # An app-layout product has no numbered section, so no section shot. When this deploy's photos worked
+          # but took none, drop the old one too, or the README keeps showing a screen the site no longer has.
+          if [ -f "$SHOTS/desktop-light.png" ] && [ ! -f "$SHOTS/section-light.png" ]; then
+            git rm -q --ignore-unmatch docs/screenshots/section-light.png
+            rm -f docs/screenshots/section-light.png
+          fi
           # Only our own file names, and only real PNGs of a sane size.
           for name in desktop-light section-light mobile-light; do
             f="$SHOTS/$name.png"
