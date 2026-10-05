@@ -48,10 +48,11 @@ Go through every item. Fix the blueprint when the fix is clear and stays within 
 9. **Compass.** No-go list (including the excluded business areas), budget (no paid APIs, no paid domains), stack,
    at most 3 screens. Personal data stays in the browser unless the core flow truly needs a server.
 10. **Concrete.** No "TBD", no placeholder copy, real field and route names.
-11. **Identity.** The Identity section has a 2–4 word lowercase tag, a one-sentence description that claims nothing the
-    product doesn't do, a real headline with at most one accent word, and
-    numbered sections with the tool as `01`. No task asks for a logo, icon set, illustration, custom colours or another
-    font: the template's "Look & feel" decides the look.
+11. **Identity.** The Identity section names a layout, has a 2–4 word lowercase tag and a one-sentence description that
+    claims nothing the product doesn't do. An `app` lists its screens with plain view titles and puts the tool on the
+    first screen, with no hero or marketing headline; a `page` has a real headline with at most one accent word and
+    numbered sections. A tool, tracker or dashboard written as a `page` is wrong: switch it to `app`. No task asks for
+    a logo, icon set, illustration, custom colours or another font: the template's "Look & feel" decides the look.
 
 ## Rules for edits
 

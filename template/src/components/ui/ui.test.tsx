@@ -1,8 +1,19 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import { Button, Checkbox, EmptyState, Field, Segmented, ThemeToggle } from './index.ts';
-import { Section } from '../shell/index.ts';
+import { useState } from 'react';
+import {
+  Button,
+  Checkbox,
+  Drawer,
+  EmptyState,
+  Field,
+  Pane,
+  Segmented,
+  StatusDot,
+  ThemeToggle,
+} from './index.ts';
+import { AppHeader, AppShell, Section, ViewHeader } from '../shell/index.ts';
 
 afterEach(() => {
   localStorage.clear();
@@ -127,5 +138,83 @@ describe('Section', () => {
       </Section>,
     );
     expect(screen.getByRole('region', { name: 'Checklist' })).toBeInTheDocument();
+  });
+});
+
+describe('AppShell', () => {
+  it('puts the view right under the bar, with the current screen marked in the nav', () => {
+    render(
+      <AppShell
+        header={
+          <AppHeader
+            nav={[
+              { href: '/', label: 'board' },
+              { href: '/new', label: 'new' },
+            ]}
+            current="/"
+          />
+        }
+      >
+        <ViewHeader title="Board" meta="3 projects" />
+      </AppShell>,
+    );
+    expect(screen.getByRole('heading', { level: 1, name: 'Board' })).toBeInTheDocument();
+    // Desktop tabs and the phone row render the same nav; CSS shows one of them.
+    const current = screen.getAllByRole('link', { name: 'board' });
+    expect(current[0]).toHaveAttribute('aria-current', 'page');
+    expect(screen.getAllByRole('link', { name: 'new' })[0]).not.toHaveAttribute('aria-current');
+    expect(screen.getByRole('main')).toHaveTextContent('3 projects');
+  });
+});
+
+describe('Pane', () => {
+  it('is a region named by its label', () => {
+    render(
+      <Pane label="Recent" aside="4">
+        <p>rows</p>
+      </Pane>,
+    );
+    expect(screen.getByRole('region', { name: 'Recent' })).toHaveTextContent('rows');
+  });
+});
+
+describe('StatusDot', () => {
+  it('says its status in words', () => {
+    render(<StatusDot tone="success" label="Up" />);
+    expect(screen.getByRole('img', { name: 'Up' })).toBeInTheDocument();
+  });
+});
+
+describe('Drawer', () => {
+  function Harness() {
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        <Button onClick={() => setOpen(true)}>Open</Button>
+        <Drawer open={open} onClose={() => setOpen(false)} title="New idea">
+          <p>form</p>
+        </Drawer>
+      </>
+    );
+  }
+
+  it('opens as a named dialog, takes focus, and closes on Escape with focus restored', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const opener = screen.getByRole('button', { name: 'Open' });
+    await user.click(opener);
+    const dialog = screen.getByRole('dialog', { name: 'New idea' });
+    expect(dialog).toHaveFocus();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(opener).toHaveFocus();
+  });
+
+  it('closes from its close button', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

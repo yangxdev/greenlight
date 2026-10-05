@@ -2,13 +2,17 @@ export { Button, IconButton } from './Button.tsx';
 export { Cell, CellGrid, Stat } from './CellGrid.tsx';
 export { Checkbox } from './Checkbox.tsx';
 export { DetailList, type Detail } from './DetailList.tsx';
+export { Drawer } from './Drawer.tsx';
 export { EmptyState } from './EmptyState.tsx';
 export { Field } from './Field.tsx';
 export { Mark } from './Mark.tsx';
 export { Note } from './Note.tsx';
+export { Pane } from './Pane.tsx';
 export { RuledItem, RuledList } from './RuledList.tsx';
 export { Segmented, type SegmentedOption } from './Segmented.tsx';
 export { Skeleton } from './Skeleton.tsx';
+export { StatusDot, type StatusTone } from './StatusDot.tsx';
+export { TextArea } from './TextArea.tsx';
 export { ThemeToggle } from './ThemeToggle.tsx';
 export {
   buttonClass,

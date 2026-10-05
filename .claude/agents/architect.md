@@ -38,9 +38,12 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
    (e.g. a nullable `verifiedOn`, never the build date) and list the checks under Setup notes.
 8. **Nothing breaks on the first change.** Derive counts and totals from the data instead of hard-coding them, and
    test rules rather than today's numbers.
-9. **Give it an identity.** Fill in the Identity section: a short mono tag, the real headline, and the numbered
-   sections. The look itself is fixed by the template; don't describe
-   colours, fonts or components, and don't ask for logos, icons or illustrations.
+9. **Give it an identity and a layout.** Fill in the Identity section. Pick `Layout: app` for anything people use,
+   track or come back to (most products): the tool sits right under a compact bar, each screen has a plain view title,
+   and nothing presents the product to itself. Pick `page` only when the product's job is to be read top to bottom
+   (a guide, an explainer, a public log); then write the real headline and the numbered sections. The look itself is
+   fixed by the template; don't describe colours, fonts or components, and don't ask for logos, icons or
+   illustrations.
 10. If the idea breaks the compass (no-go list, budget, stack), still write a blueprint for the closest compliant
    version, and state the conflict in the first line under the title as `> ⚠️ Compass conflict: …`.
 

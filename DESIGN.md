@@ -7,10 +7,10 @@ image or mascot made for them. This file is the authority. Where a repo's own ru
 
 ## The idea
 
-**A page is a ruled document, not a stack of cards.** The structure comes from sakana.ai and Japanese corporate sites:
-white first, hairlines instead of boxes, numbered sections with a left rail, mono for every label, one vermilion
-accent (朱色, the colour of a torii gate and of hanko ink). Distinction comes from type scale, spacing and restraint,
-never from decoration.
+**Ruled, not stacked.** The structure comes from sakana.ai and Japanese corporate sites: white first, hairlines
+instead of boxes, mono for every label, one vermilion accent (朱色, the colour of a torii gate and of hanko ink).
+Distinction comes from type scale, spacing and restraint, never from decoration. A tool shows itself first; only a
+document introduces itself with a headline and numbered sections (see **Two layouts**).
 
 ## Non-negotiables (everywhere, every medium)
 
@@ -52,7 +52,8 @@ yangxdev.com names the same values differently (`band` = `zone`, `hairline` = `l
 
 | Step | Size | Use |
 |------|------|-----|
-| display | 72 / 0.98, −0.035em | the one hero headline |
+| display | 72 / 0.98, −0.035em | the one hero headline of a `page` |
+| title | 26 / 1.25, −0.015em | an app view's h1 |
 | h2 | 36 / 1.15, −0.02em | section titles |
 | h3 | 20–24 | row and cell titles |
 | lede | 19 / 1.75 | the paragraph under a headline |
@@ -65,12 +66,20 @@ wherever numbers line up.
 
 ## Layout and components
 
-- **One container** (80rem, 5rem gutter) for header, hero, sections and footer, so every left edge lines up.
-- **Anatomy:** header (mark, lowercase name, mono tag, mono nav) → hero (optional mono eyebrow, display headline with at
-  most one accent word, one-sentence lede, one action) → numbered sections `01`, `02`… each with a rail label →
-  footer (mark, name, a few mono links, notes about what the product stores and can't do).
+- **Two layouts.** Pick by what the reader came to do.
+  - **App** (the default for products and the dashboard): a compact bar (mark, lowercase name, mono tag, screens as
+    mono tabs, one action, theme switch) → per screen a view header (plain title, a mono meta line, one primary
+    action, filters on its bottom rule) → the working view edge to edge on a 2rem edge: panes with a mono label strip,
+    tiles in a shared-border grid, ruled rows → a one-line footer strip. A detail or form opens in a drawer over the
+    view. No hero, no slogan, no numbered rail: the first screen is the product doing its job.
+  - **Page** (documents: a guide, an explainer, a public log, yangxdev.com): one container (80rem, 5rem gutter) for
+    header, hero, sections and footer, so every left edge lines up. Header (mark, lowercase name, mono tag, mono nav)
+    → hero (optional mono eyebrow, display headline with at most one accent word, one-sentence lede, one action) →
+    numbered sections `01`, `02`… each with a rail label → footer (mark, name, a few mono links, notes about what the
+    product stores and can't do).
 - **Lists are ruled rows**, not cards: meta (index, date, kind) in mono on the left, content, one control on the right.
-- **Facts are cells sharing borders** (`01` + title + line), or a big mono figure with a caption.
+- **Facts are cells sharing borders** (`01` + title + line), or a big mono figure with a caption. **Many same-kind
+  objects** to scan at once are tiles in the same shared-border grid: a mono meta line, a title, one status dot.
 - **One primary button per view: solid ink, square.** Everything else is a ghost. Buttons are never 朱色.
 - **Filters are mono words over a rule**, not pills. **Caveats are footnotes** under what they qualify, not banners.
 - **Empty states** are a dashed ruled box with a title, one line and one action. **Loading** is a skeleton shaped like
@@ -84,7 +93,7 @@ The non-negotiables hold in all three. The registers differ only where noted.
 
 | | **Document** (default) | **Tool** | **Personal** |
 |-|------------------------|----------|--------------|
-| Where | greenlight products and dashboard, READMEs, diagrams | waypoint and any app that is a long list of same-kind objects used on the go | yangxdev.com only |
+| Where | greenlight products (app or page layout) and dashboard, READMEs, diagrams | waypoint and any app that is a long list of same-kind objects used on the go | yangxdev.com only |
 | Corners | square everywhere; status dots are the only circles | 6px on cards, inputs and buttons, 4px on chips | square everywhere |
 | Depth | hairlines only | hairline plus a whisper of shadow on cards, a little more on hover | hairlines only |
 | Labels | 11px uppercase mono | 12px uppercase sans; mono only for data you transcribe | 11px uppercase mono, with a Japanese gloss |
@@ -93,12 +102,14 @@ The non-negotiables hold in all three. The registers differ only where noted.
 **The personal layer never leaves yangxdev.com.** No seal, kanji or vertical labels on products, the dashboard or
 greenlight's images.
 
-## Greenlight dashboard (planned)
+## Greenlight dashboard
 
-Document register. The pipeline seen from above: one row of ten numbered cells (`01` Scout … `10` Observer), each with
-the actor's name, its last run and a status dot, and every cell a link to that step's runs, issues or files. Ideas
-are ruled rows with their state label in mono. **The accent marks where a human is needed**: the two gates
-(`approved`, `blueprint-ok`) and anything `stuck`. Status dots use status colours only.
+greenlight-status, document register, app layout. The pipeline seen from above: one row of ten numbered cells (`01`
+Scout … `10` Observer), each with the actor's name, its last run and a status dot, and every cell opens that step's
+runs. Under it, every project as a tile in a shared-border grid: name, issue number, its state in mono, a ten-segment
+strip of how far it got, and one status dot; a tile opens the project's detail, where each stage shows what happened
+and links to it. **The accent marks where a human is needed**: the two gates (`approved`, `blueprint-ok`) and
+anything `stuck`. Status dots use status colours only.
 
 ## Voice
 

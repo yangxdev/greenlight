@@ -153,8 +153,10 @@ jobs:
             - a security problem (unvalidated input reaching storage, secrets in client code, open R2 writes);
             - work outside the blueprint's scope that adds risk (auth, payments, new services).
             Style preferences and nice-to-haves are "minor" and never fail the review. Do report, as minor, any departure
-            from CLAUDE.md → "Look & feel" that the style guard cannot catch: no numbered Sections, cards where a
-            RuledList belongs, the accent on buttons or decoration, the blueprint's Identity (tag, headline, sections) not applied,
+            from CLAUDE.md → "Look & feel" that the style guard cannot catch: the wrong layout for the blueprint's Identity (an
+            `app` with a hero or a marketing headline above the tool, a `page` without numbered Sections), cards where a
+            RuledList belongs, the accent on buttons or decoration, the blueprint's Identity (layout, tag, screens or
+            headline and sections) not applied,
             a README.md that still has bracketed placeholder lines or claims something the code doesn't do.
 
             Each finding must say where (file), what is wrong, and the concrete fix, so the Factory can act on it alone.

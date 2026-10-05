@@ -17,7 +17,8 @@ if (!url || !/^https?:\/\//.test(url) || !outDir) {
 const require = createRequire(join(process.env.PLAYWRIGHT_DIR ?? process.cwd(), 'noop.js'));
 const { chromium } = require('playwright-core');
 
-// What a visitor sees first, plus (desktop) the first numbered section, in the light theme the site opens in.
+// What a visitor sees first, plus (desktop, `page` layout only) the first numbered section, in the light theme the
+// site opens in. An `app` shows the tool on its first screen, so one shot covers it.
 // Phones at 2x so text stays sharp.
 const VIEWS = [
   { name: 'desktop-light', theme: 'light', viewport: { width: 1440, height: 960 }, scale: 1, mobile: false },

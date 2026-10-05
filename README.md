@@ -54,7 +54,9 @@ Time spent at the two human gates isn't counted, and neither is the Scout's dail
   credentialed jobs that run no AI and no repository code.
 - **Evidence over enthusiasm.** The Critic scores an idea 0 for pain when its quotes aren't in the collected signals,
   and an empty week is a valid outcome.
-- **One look.** Every product is built from the same [template](template) and [design language](DESIGN.md).
+- **One look, two layouts.** Every product is built from the same [template](template) and
+  [design language](DESIGN.md). Tools open on the tool itself (`app`); only products meant to be read get a headline
+  and numbered sections (`page`). The blueprint picks one.
 
 ## Docs
 
