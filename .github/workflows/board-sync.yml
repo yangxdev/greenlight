@@ -15,7 +15,7 @@ on:
   issues:
     types: [opened, reopened, closed, labeled, unlabeled]
   workflow_run:
-    workflows: [Architect, Factory dispatch, Ideas]
+    workflows: [Architect, Factory dispatch, Ideas, Observer]
     types: [completed]
   workflow_dispatch:
 
@@ -90,7 +90,13 @@ jobs:
 
           for issue in issues:
               names = {label["name"] for label in issue["labels"]}
-              state = "archived" if issue["state"] == "CLOSED" else next((s for s in STATES if s in names), None)
+              if issue["state"] == "CLOSED":
+                  state = "shipped" if "shipped" in names else "archived"
+              else:
+                  state = next((s for s in STATES if s in names), None)
+                  # A change waiting for approval carries only its kind label.
+                  if state is None and "change" in names:
+                      state = "idea"
               if state is None:
                   continue  # not an idea (e.g. the weekly reports issue): left as it is
               if state not in options:

@@ -1,12 +1,13 @@
-# Keeps the no-AI script packages (scout/, observer/) typechecked, linted and tested. No network in tests.
+# Keeps the no-AI script packages (scout/, observer/) typechecked, linted and tested, and the workflow helper scripts
+# (.github/scripts/) tested. No network in tests.
 name: Scripts CI
 
 on:
   push:
     branches: [main]
-    paths: ["scout/**", "observer/**", ".github/workflows/scripts-ci.yml"]
+    paths: ["scout/**", "observer/**", ".github/scripts/**", ".github/workflows/scripts-ci.yml"]
   pull_request:
-    paths: ["scout/**", "observer/**", ".github/workflows/scripts-ci.yml"]
+    paths: ["scout/**", "observer/**", ".github/scripts/**", ".github/workflows/scripts-ci.yml"]
 
 permissions:
   contents: read
@@ -36,3 +37,13 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm audit --audit-level=high
+
+  workflow-scripts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Template sync tests
+        run: python3 -m unittest discover -s .github/scripts -v

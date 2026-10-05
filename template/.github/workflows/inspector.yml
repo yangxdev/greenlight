@@ -1,7 +1,8 @@
 # Inspector: gates every pull request into main.
 #
 #   checks  (no secrets)    secret scan, install, lint, test, build, audit
-#   review  (AI, no PAT)    Claude checks the diff against blueprint.md, only if every check passed.
+#   review  (AI, no PAT)    Claude checks the diff against blueprint.md (or, for a change, against its spec in
+#                           changes/), only if every check passed.
 #                           It has read-only tools and returns a structured verdict.
 #   decide  (PAT, no AI)    comments the verdict. On Factory PRs: pass means merge (Publisher deploys);
 #                           fail sends the findings back to the Factory, up to INSPECTOR_MAX_ROUNDS,
@@ -126,8 +127,13 @@ jobs:
           persist-credentials: false
 
       - name: Export the change for review
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           mkdir -p .greenlight-run
+          # A Factory change build names its spec in the PR body; only that exact form is accepted.
+          change=$(grep -oE 'greenlight:change=changes/[0-9]+\.md' <<<"$PR_BODY" | head -n1 | cut -d= -f2 || true)
+          if [ -n "$change" ] && [ -f "$change" ]; then echo "$change" > .greenlight-run/change.txt; fi
           git diff "${BASE_SHA}...${HEAD_SHA}" > .greenlight-run/pr.diff
           git log --format='%h %s' "${BASE_SHA}..${HEAD_SHA}" > .greenlight-run/commits.txt
           git diff --stat "${BASE_SHA}...${HEAD_SHA}" > .greenlight-run/diffstat.txt
@@ -143,8 +149,14 @@ jobs:
             You are the Greenlight Inspector. Deterministic checks (lint, tests, build, audit, secret scan) already
             passed. Judge whether this pull request delivers what blueprint.md promises, to the standard in CLAUDE.md.
 
-            Read: blueprint.md, CLAUDE.md, build-report.md (if present), .greenlight-run/diffstat.txt,
-            .greenlight-run/commits.txt, .greenlight-run/pr.diff, and any source file you need for context.
+            If .greenlight-run/change.txt exists, this pull request is a change to the live product: the file it names
+            (changes/<issue>.md) is the spec to judge against, instead of blueprint.md. Its tasks and criteria (CH1, …)
+            must be delivered; blueprint.md is context. A change must not break what it doesn't mention: an existing test
+            removed or weakened without the change asking for it is a blocker.
+
+            Read: blueprint.md, the change spec if there is one, CLAUDE.md, build-report.md (if present),
+            .greenlight-run/diffstat.txt, .greenlight-run/commits.txt, .greenlight-run/pr.diff, and any source file you
+            need for context.
 
             Mark verdict "fail" only for blockers:
             - an acceptance criterion that is not implemented, or has no test that meaningfully exercises it;
@@ -203,8 +215,14 @@ jobs:
         env:
           BOT_TOKEN: ${{ github.token }}
           PAT: ${{ secrets.GREENLIGHT_TOKEN }}
+          PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           set -euo pipefail
+          # A Factory PR names the greenlight issue it reports to (a change's own issue); the repo variable is the
+          # product's idea issue, for older PRs.
+          marked=$(grep -oE 'greenlight:issue=[0-9]+' <<<"$PR_BODY" | head -n1 | cut -d= -f2 || true)
+          if [ -n "$marked" ]; then GREENLIGHT_ISSUE="$marked"; fi
+          change=$(grep -oE 'greenlight:change=changes/[0-9]+\.md' <<<"$PR_BODY" | head -n1 | cut -d= -f2 || true)
           icon() { case "$1" in success) echo "✅";; skipped) echo "⏭️";; *) echo "❌";; esac; }
           body="$RUNNER_TEMP/comment.md"
 
@@ -295,7 +313,8 @@ jobs:
               if [ "$prev_fails" -lt "$MAX_ROUNDS" ]; then
                 gh api "repos/$GITHUB_REPOSITORY/dispatches" -f event_type=greenlight-fix \
                   -f "client_payload[pr]=$PR" -f "client_payload[round]=$round" \
-                  -f "client_payload[greenlight_repo]=$GREENLIGHT_REPO" -f "client_payload[issue]=$GREENLIGHT_ISSUE"
+                  -f "client_payload[greenlight_repo]=$GREENLIGHT_REPO" -f "client_payload[issue]=$GREENLIGHT_ISSUE" \
+                  -f "client_payload[change]=$change"
                 echo "Dispatched Factory fix round $round"
               else
                 stuck "failed ${MAX_ROUNDS} fix rounds and needs a human."

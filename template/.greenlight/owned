@@ -1,0 +1,15 @@
+# Files the template owns. Template sync (greenlight's template-sync.yml) brings each product's copy up to date with
+# the template, as long as the product hasn't changed it since the template version in .greenlight/template. A copy
+# the product changed is kept, and the sync pull request lists it.
+#
+# One path per line. A line ending in / covers everything under that folder.
+.github/
+.greenlight/owned
+CLAUDE.md
+scripts/check-style.ts
+scripts/check-style.test.ts
+src/components/shell/
+src/components/ui/
+src/index.css
+src/lib/cn.ts
+src/lib/theme.ts

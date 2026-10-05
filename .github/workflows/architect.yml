@@ -2,6 +2,10 @@
 # have Claude write blueprint.md, have a second Claude review and repair it, then hand back to the human
 # with "blueprint-ready" and a summary of the review.
 #
+# A change (an issue labelled "change", a sub-issue of a live product's idea issue) takes the same path on the
+# existing product repo: Claude writes a change spec, committed as changes/<issue>.md. No repo is ever created
+# for a change, and the product repo's settings are left alone.
+#
 # Security model: no AI job shares a runner with GREENLIGHT_TOKEN.
 #   scaffold  (PAT, no AI)    create/reuse the product repo, copy secrets, export context
 #   blueprint (AI, no PAT)    Claude writes blueprint.md, uploaded as an artifact
@@ -30,10 +34,16 @@ jobs:
     if: github.event.label.name == 'approved' && github.actor == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
     outputs:
       full: ${{ steps.repo.outputs.full }}
       name: ${{ steps.repo.outputs.name }}
       visibility: ${{ steps.context.outputs.visibility }}
+      kind: ${{ steps.kind.outputs.kind }}
+      parent: ${{ steps.kind.outputs.parent }}
+      spec: ${{ steps.kind.outputs.spec }}
     steps:
       - name: Check required secrets
         env:
@@ -55,6 +65,30 @@ jobs:
           git config --global user.name "greenlight-architect"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Idea or change
+        id: kind
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if ! gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json labels --jq '.labels[].name' | grep -qx change; then
+            { echo "kind=idea"; echo "spec=blueprint.md"; echo "parent="; } >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # The product's idea issue: the sub-issue parent, else the dashboard's marker, else the Change form's field.
+          parent=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/parent" --jq .number 2>/dev/null || true)
+          if [ -z "$parent" ]; then
+            body=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json body --jq .body)
+            parent=$(grep -oE 'greenlight:parent=[0-9]+' <<<"$body" | head -n1 | cut -d= -f2 || true)
+            if [ -z "$parent" ]; then
+              parent=$(awk '/^### Product issue/ {f=1; next} f && /#[0-9]+/ {match($0, /#[0-9]+/); print substr($0, RSTART+1, RLENGTH-1); exit}' <<<"$body")
+            fi
+          fi
+          if ! [[ "$parent" =~ ^[0-9]+$ ]] || [ "$parent" = "$ISSUE" ]; then
+            echo "::error::This change names no product issue (make it a sub-issue of the product's idea issue)"; exit 1
+          fi
+          { echo "kind=change"; echo "spec=change.md"; echo "parent=$parent"; } >> "$GITHUB_OUTPUT"
+          echo "Change #$ISSUE to the product of #$parent"
+
       - name: Resolve product repo name
         id: repo
         env:
@@ -62,12 +96,20 @@ jobs:
           OWNER: ${{ github.repository_owner }}
           TITLE: ${{ github.event.issue.title }}
           PREFIX: ${{ vars.PRODUCT_PREFIX }}
+          KIND: ${{ steps.kind.outputs.kind }}
+          PARENT: ${{ steps.kind.outputs.parent }}
         run: |
-          # Re-runs reuse the repo recorded by an earlier Architect comment on this issue. Only comments from the
-          # workflow bot or people with write access count: anyone can comment on a public issue.
-          recorded=$(gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
+          # Re-runs reuse the repo recorded by an earlier Architect comment on this issue (for a change: on the product's
+          # idea issue). Only comments from the workflow bot or people with write access count: anyone can comment on a
+          # public issue.
+          source_issue="$ISSUE"
+          if [ "$KIND" = change ]; then source_issue="$PARENT"; fi
+          recorded=$(gh api "repos/$GITHUB_REPOSITORY/issues/$source_issue/comments" --paginate \
             --jq '.[] | select(.user.login == "github-actions[bot]" or .author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | .body' \
             | grep -oE 'greenlight:repo=[A-Za-z0-9._-]+/[A-Za-z0-9._-]+' | tail -n1 | cut -d= -f2 || true)
+          if [ "$KIND" = change ] && [ -z "$recorded" ]; then
+            echo "::error::Product issue #$PARENT has no product repo yet, so there is nothing to change"; exit 1
+          fi
           if [ -n "$recorded" ]; then
             full="$recorded"
           else
@@ -80,6 +122,9 @@ jobs:
           fi
           exists=false
           if gh repo view "$full" >/dev/null 2>&1; then exists=true; fi
+          if [ "$KIND" = change ] && [ "$exists" != true ]; then
+            echo "::error::$full, the product of #$PARENT, does not exist"; exit 1
+          fi
           {
             echo "full=$full"
             echo "name=${full#*/}"
@@ -88,7 +133,7 @@ jobs:
           echo "Product repo: $full (exists: $exists)"
 
       - name: Create product repo from template/
-        if: steps.repo.outputs.exists != 'true'
+        if: steps.repo.outputs.exists != 'true' && steps.kind.outputs.kind == 'idea'
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           FULL: ${{ steps.repo.outputs.full }}
@@ -106,12 +151,16 @@ jobs:
           sed -i "s/greenlight-year/$(date -u +%Y)/" LICENSE.md
           # The favicon is the product's initial on the vermilion square (repo names are [a-z0-9-], so this is safe).
           sed -i "s|>g</text>|>${NAME:0:1}</text>|" public/favicon.svg
+          # The template version this product starts from: template-sync.yml compares against it later.
+          mkdir -p .greenlight && printf '%s\n' "$GITHUB_SHA" > .greenlight/template
           git init -b main
           git add -A
           git commit -m "chore: scaffold from greenlight template" -m "Idea: $GITHUB_REPOSITORY#$ISSUE"
           git -c core.hooksPath=/dev/null push "https://x-access-token:${GH_TOKEN}@github.com/${FULL}.git" main
 
       - name: Configure product repo secrets and variables
+        # A change leaves the product's settings alone: GREENLIGHT_ISSUE stays the product's idea issue.
+        if: steps.kind.outputs.kind == 'idea'
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           FULL: ${{ steps.repo.outputs.full }}
@@ -141,14 +190,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           FULL: ${{ steps.repo.outputs.full }}
+          KIND: ${{ steps.kind.outputs.kind }}
         run: |
           # Links to the repo (source, "suggest a change") only work for visitors when it is public.
           echo "visibility=$(gh repo view "$FULL" --json visibility --jq '.visibility | ascii_downcase')" >> "$GITHUB_OUTPUT"
           git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${FULL}.git" "$RUNNER_TEMP/product"
           mkdir -p "$RUNNER_TEMP/context"
-          for f in CLAUDE.md package.json blueprint.md; do
-            if [ -f "$RUNNER_TEMP/product/$f" ]; then cp "$RUNNER_TEMP/product/$f" "$RUNNER_TEMP/context/"; fi
-          done
+          if [ "$KIND" = change ]; then
+            # A change is planned against the code: the whole tracked tree, minus screenshots and the lockfile.
+            (cd "$RUNNER_TEMP/product" && git ls-files -z | grep -zvE '^(docs/screenshots/|package-lock\.json$|\.github/)' \
+              | xargs -0 cp --parents -t "$RUNNER_TEMP/context")
+          else
+            for f in CLAUDE.md package.json blueprint.md; do
+              if [ -f "$RUNNER_TEMP/product/$f" ]; then cp "$RUNNER_TEMP/product/$f" "$RUNNER_TEMP/context/"; fi
+            done
+          fi
 
       - uses: actions/upload-artifact@v7
         with:
@@ -163,6 +219,9 @@ jobs:
     permissions:
       contents: read
       issues: read
+    env:
+      KIND: ${{ needs.scaffold.outputs.kind }}
+      PARENT: ${{ needs.scaffold.outputs.parent }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -185,9 +244,14 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/issues/$ISSUE/comments" --paginate \
             --jq ".[] | select(.user.login == \"$OWNER\") | \"\n## Clarification from the owner\n\n\" + .body" \
             >> .greenlight-run/issue.md
+          if [ "$KIND" = change ]; then
+            gh issue view "$PARENT" --repo "$GITHUB_REPOSITORY" --json title,body,url \
+              --jq '"# " + .title + "\n\nSource: " + .url + "\n\n" + .body' > .greenlight-run/parent.md
+          fi
           cat .greenlight-run/issue.md
 
       - name: Write blueprint
+        if: env.KIND == 'idea'
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -213,10 +277,34 @@ jobs:
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
 
+      - name: Write change spec
+        if: env.KIND == 'change'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Architect, planning a change to a live product. Your role instructions are in
+            .claude/agents/architect.md; read them first, then follow "Changes to a live product" exactly.
+
+            Inputs (read all of them):
+            - compass.md: the owner's interests, stack, no-go list and definition of "good"
+            - .greenlight-run/issue.md: the approved change (issue #${{ github.event.issue.number }}) and the owner's comments
+            - .greenlight-run/parent.md: the product's original idea (issue #${{ needs.scaffold.outputs.parent }})
+            - templates/change.md: the required change spec structure
+            - product/: the product repo ${{ needs.scaffold.outputs.full }} as it is now: blueprint.md (its spec),
+              CLAUDE.md (conventions), changes/ (earlier changes, if any) and the source
+
+            Output: write product/change.md. Do not create, edit or delete any other file.
+          claude_args: >-
+            --max-turns ${{ vars.ARCHITECT_MAX_TURNS || '20' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep"
+
       - uses: actions/upload-artifact@v7
         with:
           name: blueprint
-          path: product/blueprint.md
+          path: product/${{ needs.scaffold.outputs.spec }}
           if-no-files-found: error
           retention-days: 7
 
@@ -233,6 +321,8 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+    env:
+      SPEC: ${{ needs.scaffold.outputs.spec }}
     outputs:
       result: ${{ steps.claude.outputs.structured_output }}
     steps:
@@ -257,7 +347,7 @@ jobs:
 
       - name: Put the new draft in place
         # product-context may hold the previous blueprint; the review is of this run's draft.
-        run: cp "$RUNNER_TEMP/draft/blueprint.md" product/blueprint.md
+        run: cp "$RUNNER_TEMP/draft/$SPEC" "product/$SPEC"
 
       - name: Review blueprint
         id: claude
@@ -270,15 +360,15 @@ jobs:
             Read them first and follow them exactly.
 
             Inputs:
-            - product/blueprint.md: the Architect's blueprint for ${{ needs.scaffold.outputs.full }}. Edit it in place.
-            - .greenlight-run/issue.md: the approved idea (issue #${{ github.event.issue.number }}) and owner clarifications
+            - product/${{ needs.scaffold.outputs.spec }}: the Architect's ${{ needs.scaffold.outputs.kind == 'change' && 'change spec for the live product' || 'blueprint for' }} ${{ needs.scaffold.outputs.full }}. Edit it in place.${{ needs.scaffold.outputs.kind == 'change' && ' Follow the "Change specs" section of your instructions; product/ holds the whole product repo and templates/change.md the structure.' || '' }}
+            - .greenlight-run/issue.md: the approved ${{ needs.scaffold.outputs.kind }} (issue #${{ github.event.issue.number }}) and owner clarifications
             - compass.md, templates/blueprint.md, .claude/agents/architect.md
             - product/CLAUDE.md and product/package.json
 
             The product repo is ${{ needs.scaffold.outputs.visibility }}: visitors can open links to it and send pull
             requests only if it is public.
 
-            Edit only product/blueprint.md, then return the structured result.
+            Edit only product/${{ needs.scaffold.outputs.spec }}, then return the structured result.
           claude_args: >-
             --max-turns ${{ vars.REVIEWER_MAX_TURNS || '20' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
@@ -288,7 +378,7 @@ jobs:
       - uses: actions/upload-artifact@v7
         with:
           name: blueprint-reviewed
-          path: product/blueprint.md
+          path: product/${{ needs.scaffold.outputs.spec }}
           if-no-files-found: error
           retention-days: 7
 
@@ -303,6 +393,8 @@ jobs:
       issues: write
     env:
       FULL: ${{ needs.scaffold.outputs.full }}
+      KIND: ${{ needs.scaffold.outputs.kind }}
+      SPEC: ${{ needs.scaffold.outputs.spec }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -321,28 +413,33 @@ jobs:
         env:
           REVIEW_RESULT: ${{ needs.review.result }}
         run: |
+          if [ "$KIND" = change ]; then
+            headings=('## Change' '## Tasks' '## Acceptance criteria' '## Non-goals'); max_tasks=5
+          else
+            headings=('## Scope' '## Data model' '## Routes' '## Tasks' '## Acceptance criteria' '## Non-goals'); max_tasks=10
+          fi
           validate() {
             local bp="$1"
             [ -s "$bp" ] || { echo "::warning::$bp is empty"; return 1; }
-            for heading in '## Scope' '## Data model' '## Routes' '## Tasks' '## Acceptance criteria' '## Non-goals'; do
+            for heading in "${headings[@]}"; do
               grep -qF "$heading" "$bp" || { echo "::warning::$bp is missing section '$heading'"; return 1; }
             done
             local tasks
             tasks=$(grep -cE '^### Task [0-9]+' "$bp" || true)
-            if [ "$tasks" -lt 1 ] || [ "$tasks" -gt 10 ]; then
-              echo "::warning::$bp must have 1-10 tasks ('### Task N: ...'), found $tasks"; return 1
+            if [ "$tasks" -lt 1 ] || [ "$tasks" -gt "$max_tasks" ]; then
+              echo "::warning::$bp must have 1-$max_tasks tasks ('### Task N: ...'), found $tasks"; return 1
             fi
           }
           mkdir -p "$RUNNER_TEMP/blueprint"
-          if [ "$REVIEW_RESULT" = "success" ] && validate "$RUNNER_TEMP/reviewed/blueprint.md"; then
-            cp "$RUNNER_TEMP/reviewed/blueprint.md" "$RUNNER_TEMP/blueprint/blueprint.md"
+          if [ "$REVIEW_RESULT" = "success" ] && validate "$RUNNER_TEMP/reviewed/$SPEC"; then
+            cp "$RUNNER_TEMP/reviewed/$SPEC" "$RUNNER_TEMP/blueprint/spec.md"
             echo "reviewed=true" >> "$GITHUB_OUTPUT"
-          elif validate "$RUNNER_TEMP/draft/blueprint.md"; then
+          elif validate "$RUNNER_TEMP/draft/$SPEC"; then
             echo "::warning::Publishing the Architect's unreviewed draft (review: $REVIEW_RESULT)"
-            cp "$RUNNER_TEMP/draft/blueprint.md" "$RUNNER_TEMP/blueprint/blueprint.md"
+            cp "$RUNNER_TEMP/draft/$SPEC" "$RUNNER_TEMP/blueprint/spec.md"
             echo "reviewed=false" >> "$GITHUB_OUTPUT"
           else
-            echo "::error::blueprint.md failed validation"; exit 1
+            echo "::error::$SPEC failed validation"; exit 1
           fi
 
       - name: Commit blueprint to product repo
@@ -353,21 +450,25 @@ jobs:
           git config --global user.name "greenlight-architect"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git clone --depth 1 "https://x-access-token:${GH_TOKEN}@github.com/${FULL}.git" product
-          cp "$RUNNER_TEMP/blueprint/blueprint.md" product/blueprint.md
+          if [ "$KIND" = change ]; then dest="changes/$ISSUE.md"; message="docs: change spec #$ISSUE"; else dest="blueprint.md"; message="docs: blueprint"; fi
+          mkdir -p "product/$(dirname "$dest")"
+          cp "$RUNNER_TEMP/blueprint/spec.md" "product/$dest"
           cd product
-          git add blueprint.md
-          git diff --cached --quiet || git commit -m "docs: blueprint" -m "Idea: $GITHUB_REPOSITORY#$ISSUE"
+          git add "$dest"
+          git diff --cached --quiet || git commit -m "$message" -m "Idea: $GITHUB_REPOSITORY#$ISSUE"
           git -c core.hooksPath=/dev/null push origin HEAD:main
           echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "dest=$dest" >> "$GITHUB_OUTPUT"
 
       - name: Hand off to the human
         env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ steps.commit.outputs.sha }}
+          DEST: ${{ steps.commit.outputs.dest }}
           REVIEWED: ${{ steps.validate.outputs.reviewed }}
           REVIEW_JSON: ${{ needs.review.outputs.result }}
         run: |
-          tasks=$(grep -E '^### Task [0-9]+' "$RUNNER_TEMP/blueprint/blueprint.md" | sed -E 's/^### /- /')
+          tasks=$(grep -E '^### Task [0-9]+' "$RUNNER_TEMP/blueprint/spec.md" | sed -E 's/^### /- /')
           # The review quotes an idea built from internet text: defuse @mentions like the Ideas publisher does.
           defuse() { sed -E 's/@/@\xE2\x80\x8B/g'; }
           if [ "$REVIEWED" = "true" ] && [ -n "$REVIEW_JSON" ]; then
@@ -384,17 +485,19 @@ jobs:
           else
             review="⚠️ **Reviewer:** failed or broke the blueprint's structure, so this is the Architect's unreviewed draft. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           fi
+          what="blueprint"; markers="<!-- greenlight:repo=${FULL} -->"
+          if [ "$KIND" = change ]; then what="change spec"; markers+=$'\n'"<!-- greenlight:change=${DEST} -->"; fi
           body=$(cat <<EOF
-          📐 **Architect:** blueprint ready at https://github.com/${FULL}/blob/main/blueprint.md (\`${SHA}\`).
+          📐 **Architect:** ${what} ready at https://github.com/${FULL}/blob/main/${DEST} (\`${SHA}\`).
 
           ${tasks}
 
           ${review}
 
-          Add the \`blueprint-ok\` label to start the Factory (you can still edit blueprint.md first).
+          Add the \`blueprint-ok\` label to start the Factory (you can still edit ${DEST} first).
           To regenerate it instead, comment your feedback on this issue and re-apply \`approved\`.
 
-          <!-- greenlight:repo=${FULL} -->
+          ${markers}
           EOF
           )
           gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body "$body"

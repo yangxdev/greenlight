@@ -56,6 +56,8 @@ scripts/check-style.ts  # the house-style guard, run by `npm run lint`
 README.md             # the repo's front page for visitors: you fill it in (see README below)
 docs/screenshots/     # screenshots of the live site, taken by the Publisher (don't edit)
 blueprint.md          # the spec (read-only for the Factory)
+changes/<issue>.md    # change specs for the live product, one per change, newest wins where they differ (read-only)
+.greenlight/          # owned: the files template sync keeps in step with greenlight's template; template: its version
 build-report.md       # written by the Factory at the end of a build
 ```
 
@@ -331,5 +333,8 @@ a human takes over. A pass merges the PR, and the Publisher deploys the Worker (
 
 ## Files the Factory must not change
 
-`blueprint.md`, `CLAUDE.md`, `.github/**`, and the `name` in `wrangler.jsonc`. If the blueprint looks wrong, stop and write why in
-`build-report.md` under "Blockers". Don't work around it.
+`blueprint.md`, `changes/**`, `CLAUDE.md`, `.github/**`, and the `name` in `wrangler.jsonc`. If the blueprint or a change
+spec looks wrong, stop and write why in `build-report.md` under "Blockers". Don't work around it.
+
+The files listed in `.greenlight/owned` belong to the template: greenlight's template sync updates them in a pull request
+whenever the template changes, as long as this repo's copy is unchanged. Build with them; put product code elsewhere.

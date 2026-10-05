@@ -166,6 +166,33 @@ jobs:
         run: |
           [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ] || { echo "No greenlight issue to report to"; exit 0; }
           run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+
+          # A merged Factory change PR names its change's issue: that issue gets the report and is closed as shipped.
+          # The product's own issue stays live; a change never takes a live product out of "live".
+          pr_body=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" --jq '.[0].body // ""' 2>/dev/null || true)
+          change_issue=""
+          if grep -qE 'greenlight:change=changes/[0-9]+\.md' <<<"$pr_body"; then
+            change_issue=$(grep -oE 'greenlight:issue=[0-9]+' <<<"$pr_body" | head -n1 | cut -d= -f2 || true)
+          fi
+          if [ -n "$change_issue" ] && [ "$change_issue" != "$GREENLIGHT_ISSUE" ]; then
+            if [ "$RESULT" = "success" ]; then
+              gh issue comment "$change_issue" --repo "$GREENLIGHT_REPO" \
+                --body "🚀 **Publisher:** shipped to ${URL} (smoke test passed on \`/api/health\`). Commit \`${GITHUB_SHA:0:7}\`, run: ${run_url}"$'\n\n'"<!-- greenlight:url=${URL} -->"
+              gh issue edit "$change_issue" --repo "$GREENLIGHT_REPO" --add-label shipped --remove-label building --remove-label stuck
+              gh issue close "$change_issue" --repo "$GREENLIGHT_REPO" --reason completed
+              # A redeploy that works clears a stuck an earlier failed one left on the product.
+              if grep -qE '(^|,)stuck(,|$)' <<<"$STATE"; then
+                gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --remove-label stuck
+              fi
+            else
+              gh issue comment "$change_issue" --repo "$GREENLIGHT_REPO" \
+                --body "🚀 **Publisher:** deploy or smoke test failed; the live site still runs the previous version. Run: ${run_url}"
+              gh issue edit "$change_issue" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
+              exit 1
+            fi
+            exit 0
+          fi
+
           if [ "$RESULT" = "success" ]; then
             # Redeploys of an already-live product stay quiet, but clear the stuck a failed redeploy left.
             if ! grep -qE '(^|,)live(,|$)' <<<"$STATE"; then

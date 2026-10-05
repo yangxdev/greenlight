@@ -28,4 +28,6 @@ jobs:
           live|0b6e2e|State: deployed and smoke-tested
           stuck|d93f0b|State: automation gave up, needs a human
           archived|cfd3d7|State: dropped or retired
+          change|bfd4f2|Kind: a change to a live product (a sub-issue of its idea issue); it keeps this label
+          shipped|0b6e2e|State: a change that is built, merged and deployed
           LABELS

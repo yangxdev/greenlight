@@ -1,5 +1,5 @@
-# Factory: implements blueprint.md (mode "build") or addresses Inspector findings on an open
-# Factory PR (mode "fix").
+# Factory: implements blueprint.md (mode "build"), or a change spec changes/<issue>.md when the dispatch names one,
+# or addresses Inspector findings on an open Factory PR (mode "fix").
 #
 # Triggers:
 #   repository_dispatch greenlight-build   from greenlight's factory-dispatch workflow
@@ -42,6 +42,8 @@ env:
   MODE: ${{ github.event.action == 'greenlight-fix' && 'fix' || inputs.mode || 'build' }}
   PR: ${{ github.event.client_payload.pr || inputs.pr }}
   ROUND: ${{ github.event.client_payload.round || '?' }}
+  # A change to the live product: the spec to build instead of blueprint.md. Empty for a first build.
+  CHANGE: ${{ github.event.client_payload.change || '' }}
 
 jobs:
   prepare:
@@ -67,6 +69,9 @@ jobs:
             echo "::error::GREENLIGHT_REPO / GREENLIGHT_ISSUE unknown (payload or repo variables)"; missing=1
           fi
           if [ "$MODE" = "fix" ] && [ -z "$PR" ]; then echo "::error::fix mode needs a PR number"; missing=1; fi
+          if [ -n "$CHANGE" ] && ! [[ "$CHANGE" =~ ^changes/[0-9]+\.md$ ]]; then
+            echo "::error::change spec '$CHANGE' is not changes/<issue>.md"; missing=1
+          fi
           exit "$missing"
 
       - name: Resolve branch
@@ -75,7 +80,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "$MODE" = "build" ]; then
-            echo "branch=factory/build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            if [ -n "$CHANGE" ]; then
+              gh api "repos/$GITHUB_REPOSITORY/contents/$CHANGE" --jq .path >/dev/null \
+                || { echo "::error::$CHANGE is not on main"; exit 1; }
+              echo "branch=factory/change-${GREENLIGHT_ISSUE}-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            else
+              echo "branch=factory/build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+            fi
             echo "base=$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)" >> "$GITHUB_OUTPUT"
           else
             read -r state head sha < <(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json state,headRefName,headRefOid \
@@ -110,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     outputs:
-      claude: ${{ env.MODE == 'build' && steps.claude.outcome || steps.claude_fix.outcome }}
+      claude: ${{ env.MODE == 'fix' && steps.claude_fix.outcome || (env.CHANGE != '' && steps.claude_change.outcome || steps.claude.outcome) }}
       commits: ${{ steps.bundle.outputs.commits }}
     env:
       BRANCH: ${{ needs.prepare.outputs.branch }}
@@ -144,7 +155,7 @@ jobs:
 
       - name: Implement blueprint
         id: claude
-        if: env.MODE == 'build'
+        if: env.MODE == 'build' && env.CHANGE == ''
         # Running out of turns fails this step; verify and publish still decide what ships.
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
@@ -175,6 +186,39 @@ jobs:
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npm audit:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
 
+      - name: Implement change
+        id: claude_change
+        if: env.MODE == 'build' && env.CHANGE != ''
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Factory. This product is live and people use it. Build one change to it.
+
+            1. Read CLAUDE.md (conventions, definition of done), blueprint.md (the product's spec) and ${{ env.CHANGE }}
+               (this change). The change spec is authoritative where it differs from blueprint.md.
+            2. Read the code the change touches before editing it. Implement the change's tasks in order. For each task:
+               - write the code and the tests that cover that task's acceptance criteria (CH1, CH2, …);
+               - run `npm run check` and fix until it passes;
+               - commit only that task: `git add -A && git commit -m "change #${{ env.GREENLIGHT_ISSUE }} task <n>: <short title>"`.
+            3. Everything the change doesn't mention keeps working. Existing tests stay green; change one only where the
+               change alters the behaviour it checks, and say so in the build report.
+            4. Stay inside the change's scope and non-goals. Do not edit blueprint.md, CLAUDE.md, changes/ or anything under
+               .github/. Do not try to push, open PRs, or call external services. Tests must not need the network.
+            5. If you run low on turns, commit the finished tasks first. A partial but green build beats a broken full one.
+            6. If the change alters what README.md describes, update it (CLAUDE.md → "README"), markers kept, and commit it:
+               `git add README.md && git commit -m "docs: readme"`.
+            7. Finally, write build-report.md at the repo root by filling in every section of .github/build-report.md, for
+               this change. The greenlight issue is ${{ env.GREENLIGHT_REPO }}#${{ env.GREENLIGHT_ISSUE }} and the run is
+               ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}.
+               Then commit it: `git add build-report.md && git commit -m "docs: build report"`.
+          claude_args: >-
+            --max-turns ${{ vars.FACTORY_MAX_TURNS || '80' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npm audit:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
+
       - name: Address Inspector findings
         id: claude_fix
         if: env.MODE == 'fix'
@@ -187,13 +231,14 @@ jobs:
             You are the Greenlight Factory, fix round ${{ env.ROUND }} for PR #${{ env.PR }}.
 
             1. Read .greenlight-run/findings.md: the Inspector's failed checks and review findings for this branch.
-            2. Read CLAUDE.md and blueprint.md. They are authoritative; the findings tell you where the build falls short.
+            2. Read CLAUDE.md and blueprint.md${{ env.CHANGE != '' && format(', and {0}: this PR builds that change, so it is the spec here', env.CHANGE) || '' }}.
+               They are authoritative; the findings tell you where the build falls short.
             3. Fix every blocker. For failing checks, reproduce with the matching npm script first.
                If a task from blueprint.md is missing, implement it with tests.
             4. Run `npm run check` until it passes, then commit: `git add -A && git commit -m "fix: <what>"`
                (several commits are fine).
             5. Update build-report.md so it reflects the current state, and commit it.
-            Do not edit blueprint.md, CLAUDE.md or anything under .github/. Do not push. Tests must not need the network.
+            Do not edit blueprint.md, CLAUDE.md, changes/ or anything under .github/. Do not push. Tests must not need the network.
           claude_args: >-
             --max-turns ${{ vars.FIX_MAX_TURNS || '40' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
@@ -301,7 +346,7 @@ jobs:
           git fetch "$RUNNER_TEMP/bundle/factory.bundle" HEAD
           git checkout --detach FETCH_HEAD
           if [ "$(git merge-base "$BASE" HEAD)" != "$BASE" ]; then echo "::error::bundle is not based on $BASE"; exit 1; fi
-          protected=$(git diff --name-only "$BASE..HEAD" | grep -E '^(\.github/|blueprint\.md$|CLAUDE\.md$)' || true)
+          protected=$(git diff --name-only "$BASE..HEAD" | grep -E '^(\.github/|changes/|blueprint\.md$|CLAUDE\.md$)' || true)
           if [ -n "$protected" ]; then echo "::error::Factory modified protected files:"; echo "$protected"; exit 1; fi
 
       - name: Push branch
@@ -314,8 +359,18 @@ jobs:
         if: env.MODE == 'build'
         run: |
           if [ -s build-report.md ]; then cp build-report.md "$RUNNER_TEMP/body.md"; else echo "_The Factory did not write a build report._" > "$RUNNER_TEMP/body.md"; fi
+          # The Inspector and the Publisher read these to report to the right greenlight issue.
+          {
+            echo
+            echo "<!-- greenlight:issue=${GREENLIGHT_ISSUE} -->"
+            if [ -n "$CHANGE" ]; then echo "<!-- greenlight:change=${CHANGE} -->"; fi
+          } >> "$RUNNER_TEMP/body.md"
           draft=()
           title="Build from blueprint (${GREENLIGHT_REPO}#${GREENLIGHT_ISSUE})"
+          if [ -n "$CHANGE" ]; then
+            name=$(gh issue view "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --json title --jq '.title | sub("^\\[change\\] *"; "")' || true)
+            title="Change: ${name:-$CHANGE} (${GREENLIGHT_REPO}#${GREENLIGHT_ISSUE})"
+          fi
           if [ "$CLAUDE" != "success" ] || [ "$VERIFY" != "success" ]; then draft=(--draft); title="[incomplete] $title"; fi
           url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "$title" --body-file "$RUNNER_TEMP/body.md" "${draft[@]}")

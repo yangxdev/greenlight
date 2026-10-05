@@ -257,6 +257,23 @@ jobs:
             body+=$'\n\n'"Report: ${report_url}"
             gh issue comment "$issue" --repo "$GITHUB_REPOSITORY" --body "$body"
             echo "Commented on #$issue: $before -> $verdict"
+
+            # "improve" with a concrete suggestion becomes a change request under the product's issue. It is only
+            # filed: building it still takes your approved label, like any change. One open Observer change per product.
+            [ "$verdict" = "improve" ] && [ -n "$suggestion" ] || continue
+            open_already=$(gh issue list --repo "$GITHUB_REPOSITORY" --label change --state open --limit 100 \
+              --json body --jq "[.[] | select(.body | contains(\"greenlight:parent=${issue} \") and contains(\"greenlight:observer\"))] | length")
+            if [ "$open_already" != "0" ]; then echo "#$issue already has an open Observer change"; continue; fi
+            title=$(printf '%s' "$suggestion" | tr '\n' ' ' | sed -E 's/[[:space:]]+/ /g' | cut -c1-70 | sed -E 's/[[:space:]]+$//')
+            reason=$(jq -r .reason <<<"$p")
+            change_body=$(printf '### Product issue\n\n#%s\n\n### What should change\n\n%s\n\n### Why\n\nThe Observer'"'"'s verdict for %s is **improve**: %s\n\nReport: %s\n\n### Must not change\n\n_No response_\n\n<!-- greenlight:parent=%s -->\n<!-- greenlight:observer week=%s -->\n' \
+              "$issue" "$suggestion" "$WEEK" "$reason" "$report_url" "$issue" "$WEEK")
+            url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "[change] ${title}" --label change --body "$change_body")
+            number=${url##*/}
+            id=$(gh api "repos/$GITHUB_REPOSITORY/issues/$number" --jq .id)
+            gh api "repos/$GITHUB_REPOSITORY/issues/$issue/sub_issues" -F "sub_issue_id=$id" >/dev/null \
+              || echo "::warning::Could not attach #$number under #$issue as a sub-issue; its body still names #$issue"
+            echo "Filed change #$number for #$issue"
           done
 
   # The next link of the Monday chain. Ideas runs even if this week's report failed or was already there.

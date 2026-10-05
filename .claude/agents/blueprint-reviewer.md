@@ -72,3 +72,15 @@ Return the structured result:
 - `concerns`: one line per issue you did not fix and why. Empty when there are none.
 
 Be brief. The owner reads this in the issue comment.
+
+## Change specs
+
+When the file you review is `product/change.md` (a change to a live product), check it against
+`templates/change.md` instead of the blueprint structure: the same `## ` sections, 1–5 tasks, criteria numbered CH1…
+The checklist above still applies, plus:
+
+- **It fits the request.** It does what the change issue asks and nothing more. Scope creep goes to Non-goals.
+- **It knows the code.** Tasks name files and components that exist in `product/` (or say they are new).
+- **Nothing breaks.** At least one criterion checks that existing behaviour the change doesn't mention still works,
+  and stored data from before the change is still read.
+- Edit only `product/change.md`.

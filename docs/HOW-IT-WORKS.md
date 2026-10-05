@@ -69,6 +69,44 @@ the usage budget and the security model. To run your own copy, see [SETUP.md](SE
    - the next Analyst run reads the report's "Signals for the Analyst". With nothing live, the AI step is skipped and a
      board-only report is written instead.
 
+## After a product is live
+
+A live product changes in two ways, kept apart because one needs judgement and the other doesn't.
+
+**Changes** (AI, through the same stages). A change is an issue labelled `change`, titled `[change] …`, and filed as a
+**sub-issue of the product's idea issue**: by you with the *Change* form or the dashboard's "Request a change", or by
+the Observer when a product's verdict turns to `improve`. It goes through the same gates as an idea, on the existing
+product repo, while the product stays `live`:
+
+1. **You** add `approved`. The Architect reads the change, the product's idea, its blueprint and its code, and writes
+   a change spec of **1 to 5 tasks** (`templates/change.md`), committed as `changes/<issue>.md` in the product repo.
+   The Reviewer checks it like a blueprint, plus: does it fit the request, does it know the code, does it keep the
+   rest working. The issue becomes `blueprint-ready`. No repo is created and the product repo's settings are left alone.
+2. **You** add `blueprint-ok`. Factory dispatch (still one build at a time) sends the spec's path; the Factory builds
+   it on branch `factory/change-<issue>-<run>`, with `changes/` protected like `blueprint.md`.
+3. The Inspector judges the PR against the change spec. It also treats an existing test removed or weakened without
+   the spec asking for it as a blocker.
+4. On merge the Publisher deploys. The change's issue gets the report and is closed as `shipped`. The product's
+   issue never leaves `live`.
+
+The PR body carries `<!-- greenlight:issue=N -->` (and `change=…` for a change), which is how the Inspector and the
+Publisher, whose repo variable names only the product's idea issue, report to the right issue.
+
+**Template sync** (no AI). Every product repo records the template version it was built from in
+`.greenlight/template`, and `template/.greenlight/owned` lists the files the template owns: `.github/`, `CLAUDE.md`, the
+shell and UI components, the tokens, the style guard. When `template/` changes on `main` (or when you run it by hand),
+`template-sync.yml` opens or updates a **Template sync** pull request on every live product. For each owned file
+(`.github/scripts/template_sync.py`):
+
+- the product's copy equals some version of the template: it was never changed, just behind, so it takes the new one;
+- no template version ever had it: the product's own file, kept;
+- otherwise it was changed in the product: kept, and listed in the PR.
+
+The product's Inspector runs the checks on it but never merges it (only Factory branches drive the pipeline), so
+merging is yours, and it deploys like any push to `main`. Template sync is how fixes to the workflows, `CLAUDE.md` and
+the components reach products, including the change support above. It never changes a product's layout: moving a
+product from `page` to `app` is a change ("Move to the app layout"), because its screens have to be rebuilt.
+
 Things the Factory can't do for you are listed under "Manual setup required" in the PR's build report: creating an R2
 bucket, `npx wrangler secret put MONGODB_URI`, and Atlas network access.
 
@@ -116,6 +154,7 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 ## Label state machine
 
 Each idea issue carries exactly one state label. Two transitions are human gates: you add `approved` and `blueprint-ok`.
+Changes use the same labels from `approved` to `building`, then end as `shipped` instead of `live`.
 
 <img src="../assets/diagrams/states-light.svg" width="960" alt="The label states in order: idea, approved (you), blueprint-ready (Architect), blueprint-ok (you), building (dispatch). While building, the Factory opens a PR, the Inspector reviews it and runs the checks, and on a pass it merges and the Publisher deploys and smoke-tests, which sets live. On a fail the Factory pushes a fix, at most three rounds; then, or when any automated step fails, the issue is stuck. You can move any state to archived.">
 
@@ -129,6 +168,8 @@ Each idea issue carries exactly one state label. Two transitions are human gates
 | `live` | Publisher | Deployed to `<name>.<you>.workers.dev` and `/api/health` answered `{ ok: true }` |
 | `stuck` | any workflow | Automation gave up. The issue comment links the failed run or PR |
 | `archived` | you · Observer suggestion | Dropped or retired. Close the issue too |
+| `change` | Change form · dashboard · Observer | Not a state: marks a change to a live product (a sub-issue of its idea issue). Kept for its whole life; with no state label it waits for your `approved` |
+| `shipped` | Publisher | A change that was built, merged and deployed. The issue is closed |
 
 Retry anything by removing and re-adding the gate label (`approved` or `blueprint-ok`). A stuck PR can be fixed by
 hand: push to its `factory/*` branch and the Inspector re-runs. If it passes, it merges and the Publisher clears `stuck`.
@@ -141,14 +182,16 @@ compass.md                  your interests, stack, no-go list, definition of "go
 docs/                       HOW-IT-WORKS.md (this file) and SETUP.md
 DESIGN.md                   the design language: tokens, type, layout, registers, image style, mascot brief
 assets/diagrams/            README diagrams (SVG, light and dark), drawn by build.py from the DESIGN.md tokens
-templates/                  idea.md, blueprint.md, weekly-report.md (handoff formats)
+templates/                  idea.md, blueprint.md, change.md, weekly-report.md (handoff formats)
 .claude/agents/             analyst.md, critic.md, architect.md, blueprint-reviewer.md, observer.md (role prompts)
-.github/ISSUE_TEMPLATE/     idea.yml (hand-write ideas)
+.github/ISSUE_TEMPLATE/     idea.yml (hand-write ideas), change.yml (ask for a change to a live product)
+.github/scripts/            template_sync.py (+ tests): the file comparison behind template-sync.yml
 .github/workflows/
   setup-labels.yml          run once: creates the state labels
   architect.yml             on label "approved"
   factory-dispatch.yml      on label "blueprint-ok"
   template-ci.yml           keeps template/ lint/test/build green
+  template-sync.yml         on template/ changes: a sync pull request on every live product
   scout.yml                 daily: pull signals into MongoDB (or a JSONL artifact without it); Mondays start the Observer
   uptime.yml                every 6h: probe live products, store history in MongoDB
   board-sync.yml            on label changes: set each card's Status on the Project board from its state label
@@ -161,6 +204,7 @@ reports/                    weekly reports (<week>.md) and verdicts (<week>.json
 scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Exchange, Discourse, RSS fetchers + ranked export (see ../scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
+  .greenlight/owned         the files template sync keeps up to date (the scaffold adds .greenlight/template)
   CLAUDE.md                 stack conventions, Look & feel (house style), README, R2/Mongo usage, testing rules, definition of done
   README.md                 the product repo's front page: a skeleton the Factory fills; the Publisher adds link and screenshots
   src/index.css             house-style tokens (yangxdev.com / sakana.ai family): colours, type, spacing, motion
@@ -180,5 +224,5 @@ template/                   product skeleton copied into every new product repo
 **Why `template/` is a folder, not a GitHub template repo:** the Architect already checks out greenlight, so copying a
 folder costs nothing, and template changes land in the same PR as workflow changes that depend on them.
 `template-ci.yml` keeps it green. A template repo would only add the "Use this template" button, which nothing here uses.
-In both setups, existing products don't receive later template changes. That's intended, because each product is a
-snapshot.
+Either way, products don't change when the template does: `template-sync.yml` brings template changes to them as pull
+requests you merge (see "After a product is live").

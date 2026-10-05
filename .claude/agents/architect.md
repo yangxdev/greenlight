@@ -48,3 +48,22 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
    version, and state the conflict in the first line under the title as `> ⚠️ Compass conflict: …`.
 
 Keep the blueprint under about 250 lines. The owner reviews it before anything is built.
+
+## Changes to a live product
+
+When the issue is a **change** (it carries the `change` label and belongs to a product's idea issue), you write a change
+spec, not a blueprint. The product is live and people use it; the change is built on its existing repo.
+
+- Inputs: the change request (`.greenlight-run/issue.md`, with the owner's comments), the product's idea
+  (`.greenlight-run/parent.md`), `templates/change.md`, and the whole product repo under `product/`: its
+  `blueprint.md`, `CLAUDE.md`, any earlier `changes/*.md` and the source. Read the code the change touches before you
+  plan it: name real files, components and routes.
+- Output: exactly one file, `product/change.md`, following `templates/change.md`: the same `## ` sections in the same
+  order and **1 to 5 tasks**. Never edit `product/blueprint.md` or any other file.
+- Keep it small. The change request decides the scope; anything beyond it goes to Non-goals. Everything the change
+  doesn't mention must keep working, so include at least one acceptance criterion for what must not break.
+- Existing data keeps working: if a stored shape changes, say how old records are read.
+- **Layout moves.** A request to move a product to the template's `app` layout (or to `page`) gets an Identity section
+  with the new layout and its screens, and tasks that rebuild the screens from the new shell components
+  (`CLAUDE.md` → "Look & feel"). Keep the product's behaviour, data and routes; only the presentation moves.
+- The same rules as for blueprints apply: concrete, nothing false goes live, criteria are tests, stay in the stack.
