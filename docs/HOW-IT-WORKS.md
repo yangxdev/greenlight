@@ -115,7 +115,8 @@ bucket, `npx wrangler secret put MONGODB_URI`, and Atlas network access.
 The Pro plan's usage limits are the real budget:
 
 - **One build at a time.** factory-dispatch checks the `building` label.
-- **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80),
+- **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), and for a change, which reads
+  the product's code first, `ARCHITECT_CHANGE_MAX_TURNS` (40) and `REVIEWER_CHANGE_MAX_TURNS` (30); `FACTORY_MAX_TURNS` (80),
   `FIX_MAX_TURNS` (40), `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
   Worst case per product is about 1 Architect + 1 blueprint review + 1 build + 4 reviews + 3 fixes.
 - **Weekly idea generation is two short runs:** the Analyst (about 20 turns over about 30k tokens of signals) and the
