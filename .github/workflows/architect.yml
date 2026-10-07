@@ -223,6 +223,8 @@ jobs:
     needs: scaffold
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    outputs:
+      usage: ${{ steps.usage.outputs.marker }}
     permissions:
       contents: read
       issues: read
@@ -308,6 +310,32 @@ jobs:
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
 
+      # What Claude used in this job, as a marker for the stage comment (greenlight-status adds them up). The action
+      # writes its log even when Claude fails or runs out of turns; with no log there is no marker.
+      - name: Token usage
+        id: usage
+        if: always()
+        env:
+          STAGE: architect
+        run: |
+          f="$RUNNER_TEMP/claude-execution-output.json"
+          [ -s "$f" ] || exit 0
+          marker=$(jq -r --arg stage "$STAGE" '
+            def n: if type == "number" then . else 0 end;
+            def sum(f): map(f | n) | add // 0 | floor;
+            [.[]? | objects | select(.type == "result")] | last // empty
+            | [(.modelUsage // {}) | objects | .[] | objects] as $m
+            | (if ($m | length) > 0
+               then {i: ($m | sum(.inputTokens)), o: ($m | sum(.outputTokens)),
+                     r: ($m | sum(.cacheReadInputTokens)), w: ($m | sum(.cacheCreationInputTokens))}
+               else [.usage // {}] | {i: sum(.input_tokens), o: sum(.output_tokens),
+                     r: sum(.cache_read_input_tokens), w: sum(.cache_creation_input_tokens)}
+               end) as $u
+            | "<!-- greenlight:usage stage=\($stage) in=\($u.i) out=\($u.o) cache_read=\($u.r) cache_write=\($u.w) turns=\(.num_turns | n | floor) cost=\(.total_cost_usd | n | . * 10000 | round / 10000) -->"
+          ' "$f" 2>/dev/null || true)
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "${marker:-no usage recorded}"
+
       - uses: actions/upload-artifact@v7
         with:
           name: blueprint
@@ -332,6 +360,7 @@ jobs:
       SPEC: ${{ needs.scaffold.outputs.spec }}
     outputs:
       result: ${{ steps.claude.outputs.structured_output }}
+      usage: ${{ steps.usage.outputs.marker }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -381,6 +410,32 @@ jobs:
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
             --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","changes","concerns"],"properties":{"verdict":{"type":"string","enum":["ready","needs-owner"]},"changes":{"type":"array","maxItems":15,"items":{"type":"string","maxLength":300}},"concerns":{"type":"array","maxItems":10,"items":{"type":"string","maxLength":300}}}}'
+
+      # What Claude used in this job, as a marker for the stage comment (greenlight-status adds them up). The action
+      # writes its log even when Claude fails or runs out of turns; with no log there is no marker.
+      - name: Token usage
+        id: usage
+        if: always()
+        env:
+          STAGE: reviewer
+        run: |
+          f="$RUNNER_TEMP/claude-execution-output.json"
+          [ -s "$f" ] || exit 0
+          marker=$(jq -r --arg stage "$STAGE" '
+            def n: if type == "number" then . else 0 end;
+            def sum(f): map(f | n) | add // 0 | floor;
+            [.[]? | objects | select(.type == "result")] | last // empty
+            | [(.modelUsage // {}) | objects | .[] | objects] as $m
+            | (if ($m | length) > 0
+               then {i: ($m | sum(.inputTokens)), o: ($m | sum(.outputTokens)),
+                     r: ($m | sum(.cacheReadInputTokens)), w: ($m | sum(.cacheCreationInputTokens))}
+               else [.usage // {}] | {i: sum(.input_tokens), o: sum(.output_tokens),
+                     r: sum(.cache_read_input_tokens), w: sum(.cache_creation_input_tokens)}
+               end) as $u
+            | "<!-- greenlight:usage stage=\($stage) in=\($u.i) out=\($u.o) cache_read=\($u.r) cache_write=\($u.w) turns=\(.num_turns | n | floor) cost=\(.total_cost_usd | n | . * 10000 | round / 10000) -->"
+          ' "$f" 2>/dev/null || true)
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "${marker:-no usage recorded}"
 
       - uses: actions/upload-artifact@v7
         with:
@@ -475,6 +530,9 @@ jobs:
           DEST: ${{ steps.commit.outputs.dest }}
           REVIEWED: ${{ steps.validate.outputs.reviewed }}
           REVIEW_JSON: ${{ needs.review.outputs.result }}
+          USAGE: |-
+            ${{ needs.blueprint.outputs.usage }}
+            ${{ needs.review.outputs.usage }}
         run: |
           tasks=$(grep -E '^### Task [0-9]+' "$RUNNER_TEMP/blueprint/spec.md" | sed -E 's/^### /- /')
           # The review quotes an idea built from internet text: defuse @mentions like the Ideas publisher does.
@@ -494,6 +552,9 @@ jobs:
             review="⚠️ **Reviewer:** failed or broke the blueprint's structure, so this is the Architect's unreviewed draft. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           fi
           what="blueprint"; markers="<!-- greenlight:repo=${FULL} -->"
+          # What the Architect and the Reviewer used (empty lines dropped).
+          usage=$(grep -E '^<!-- greenlight:usage ' <<<"$USAGE" || true)
+          if [ -n "$usage" ]; then markers+=$'\n'"$usage"; fi
           if [ "$KIND" = change ]; then what="change spec"; markers+=$'\n'"<!-- greenlight:change=${DEST} -->"; fi
           body=$(cat <<EOF
           📐 **Architect:** ${what} ready at https://github.com/${FULL}/blob/main/${DEST} (\`${SHA}\`).
@@ -529,7 +590,12 @@ jobs:
       - name: Report failure
         env:
           GH_TOKEN: ${{ github.token }}
+          USAGE: |-
+            ${{ needs.blueprint.outputs.usage }}
+            ${{ needs.review.outputs.usage }}
         run: |
-          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
-            --body "📐 **Architect:** run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="📐 **Architect:** run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          usage=$(grep -E '^<!-- greenlight:usage ' <<<"$USAGE" || true)
+          if [ -n "$usage" ]; then body+=$'\n\n'"$usage"; fi
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body "$body"
           gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label approved --add-label stuck

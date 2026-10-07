@@ -113,6 +113,7 @@ jobs:
     timeout-minutes: 20
     outputs:
       result: ${{ steps.claude.outputs.structured_output }}
+      usage: ${{ steps.usage.outputs.marker }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -144,6 +145,32 @@ jobs:
             --allowedTools "Read,Write,Edit,Glob,Grep"
             --json-schema '{"type":"object","additionalProperties":false,"required":["summary","products"],"properties":{"summary":{"type":"string"},"products":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["issue","verdict","reason","suggestion"],"properties":{"issue":{"type":"integer"},"verdict":{"type":"string","enum":["keep","improve","archive"]},"reason":{"type":"string"},"suggestion":{"type":"string"}}}}}}'
 
+      # What Claude used in this job, as a marker for the stage comment (greenlight-status adds them up). The action
+      # writes its log even when Claude fails or runs out of turns; with no log there is no marker.
+      - name: Token usage
+        id: usage
+        if: always()
+        env:
+          STAGE: observer
+        run: |
+          f="$RUNNER_TEMP/claude-execution-output.json"
+          [ -s "$f" ] || exit 0
+          marker=$(jq -r --arg stage "$STAGE" '
+            def n: if type == "number" then . else 0 end;
+            def sum(f): map(f | n) | add // 0 | floor;
+            [.[]? | objects | select(.type == "result")] | last // empty
+            | [(.modelUsage // {}) | objects | .[] | objects] as $m
+            | (if ($m | length) > 0
+               then {i: ($m | sum(.inputTokens)), o: ($m | sum(.outputTokens)),
+                     r: ($m | sum(.cacheReadInputTokens)), w: ($m | sum(.cacheCreationInputTokens))}
+               else [.usage // {}] | {i: sum(.input_tokens), o: sum(.output_tokens),
+                     r: sum(.cache_read_input_tokens), w: sum(.cache_creation_input_tokens)}
+               end) as $u
+            | "<!-- greenlight:usage stage=\($stage) in=\($u.i) out=\($u.o) cache_read=\($u.r) cache_write=\($u.w) turns=\(.num_turns | n | floor) cost=\(.total_cost_usd | n | . * 10000 | round / 10000) -->"
+          ' "$f" 2>/dev/null || true)
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "${marker:-no usage recorded}"
+
       - uses: actions/upload-artifact@v7
         with:
           name: report
@@ -162,6 +189,7 @@ jobs:
     env:
       WEEK: ${{ needs.metrics.outputs.week }}
       RESULT: ${{ needs.report.outputs.result }}
+      USAGE: ${{ needs.report.outputs.usage }}
       GH_TOKEN: ${{ github.token }}
       TRACKING_TITLE: Greenlight weekly reports
     steps:
@@ -233,6 +261,8 @@ jobs:
             "$RUNNER_TEMP/observer/metrics.json")
           body="📊 **Observer, ${WEEK}:** ${summary}"$'\n\n'"Full report: ${report_url}"
           if [ -n "$warnings" ]; then body="${warnings}"$'\n\n'"${body}"; fi
+          # The report's usage goes on this one comment only, so it is counted once, not once per product.
+          if [ -n "$USAGE" ]; then body+=$'\n\n'"$USAGE"; fi
           gh issue comment "$tracking" --repo "$GITHUB_REPOSITORY" --body "$body"
 
           [ -n "$RESULT" ] || exit 0

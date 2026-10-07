@@ -123,6 +123,7 @@ jobs:
     outputs:
       claude: ${{ env.MODE == 'fix' && steps.claude_fix.outcome || (env.CHANGE != '' && steps.claude_change.outcome || steps.claude.outcome) }}
       commits: ${{ steps.bundle.outputs.commits }}
+      usage: ${{ steps.usage.outputs.marker }}
     env:
       BRANCH: ${{ needs.prepare.outputs.branch }}
       BASE: ${{ needs.prepare.outputs.base }}
@@ -244,6 +245,32 @@ jobs:
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep,Bash(npm run:*),Bash(npm install:*),Bash(npm ci),Bash(npm audit:*),Bash(npx vitest:*),Bash(npx tsc:*),Bash(npx eslint:*),Bash(git add:*),Bash(git commit:*),Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git rm:*),Bash(git mv:*),Bash(ls:*),Bash(mkdir:*)"
 
+      # What Claude used in this job, as a marker for the stage comment (greenlight-status adds them up). The action
+      # writes its log even when Claude fails or runs out of turns; with no log there is no marker.
+      - name: Token usage
+        id: usage
+        if: always()
+        env:
+          STAGE: factory
+        run: |
+          f="$RUNNER_TEMP/claude-execution-output.json"
+          [ -s "$f" ] || exit 0
+          marker=$(jq -r --arg stage "$STAGE" '
+            def n: if type == "number" then . else 0 end;
+            def sum(f): map(f | n) | add // 0 | floor;
+            [.[]? | objects | select(.type == "result")] | last // empty
+            | [(.modelUsage // {}) | objects | .[] | objects] as $m
+            | (if ($m | length) > 0
+               then {i: ($m | sum(.inputTokens)), o: ($m | sum(.outputTokens)),
+                     r: ($m | sum(.cacheReadInputTokens)), w: ($m | sum(.cacheCreationInputTokens))}
+               else [.usage // {}] | {i: sum(.input_tokens), o: sum(.output_tokens),
+                     r: sum(.cache_read_input_tokens), w: sum(.cache_creation_input_tokens)}
+               end) as $u
+            | "<!-- greenlight:usage stage=\($stage) in=\($u.i) out=\($u.o) cache_read=\($u.r) cache_write=\($u.w) turns=\(.num_turns | n | floor) cost=\(.total_cost_usd | n | . * 10000 | round / 10000) -->"
+          ' "$f" 2>/dev/null || true)
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "${marker:-no usage recorded}"
+
       - name: Bundle commits
         id: bundle
         run: |
@@ -311,9 +338,11 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
           CLAUDE: ${{ needs.agent.outputs.claude }}
+          USAGE: ${{ needs.agent.outputs.usage }}
         run: |
-          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-            --body "🏭 **Factory ($MODE):** produced no commits (agent: $CLAUDE), so it needs a human. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="🏭 **Factory ($MODE):** produced no commits (agent: $CLAUDE), so it needs a human. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ -n "$USAGE" ]; then body+=$'\n\n'"$USAGE"; fi
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
           gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
 
   publish:
@@ -327,6 +356,8 @@ jobs:
       COMMITS: ${{ needs.agent.outputs.commits }}
       CLAUDE: ${{ needs.agent.outputs.claude }}
       VERIFY: ${{ needs.verify.outputs.result || 'skipped' }}
+      # What the agent used, as a greenlight:usage marker (greenlight-status adds them up per stage).
+      USAGE: ${{ needs.agent.outputs.usage }}
       GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
     steps:
       - uses: actions/checkout@v7
@@ -374,14 +405,20 @@ jobs:
           if [ "$CLAUDE" != "success" ] || [ "$VERIFY" != "success" ]; then draft=(--draft); title="[incomplete] $title"; fi
           url=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BRANCH" \
             --title "$title" --body-file "$RUNNER_TEMP/body.md" "${draft[@]}")
-          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-            --body "🏭 **Factory:** PR opened: ${url} (agent: ${CLAUDE}, checks: ${VERIFY}). The Inspector reviews it next."
+          body="🏭 **Factory:** PR opened: ${url} (agent: ${CLAUDE}, checks: ${VERIFY}). The Inspector reviews it next."
+          if [ -n "$USAGE" ]; then body+=$'\n\n'"$USAGE"; fi
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
 
       - name: Report fix round
         if: env.MODE == 'fix'
         run: |
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" \
             --body "🏭 **Factory:** fix round ${ROUND} pushed ${COMMITS} commit(s) (agent: ${CLAUDE}, checks: ${VERIFY}). The Inspector re-runs on this push."
+          # The greenlight issue hears of each round too, so the dashboard sees the round and what it used.
+          pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${PR}"
+          body="🏭 **Factory (fix):** fix round ${ROUND} pushed ${COMMITS} commit(s) to ${pr_url} (agent: ${CLAUDE}, checks: ${VERIFY}). The Inspector re-runs on this push."
+          if [ -n "$USAGE" ]; then body+=$'\n\n'"$USAGE"; fi
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
 
   report-failure:
     needs: [prepare, agent, verify, publish]
@@ -392,8 +429,10 @@ jobs:
       - name: Report failure
         env:
           GH_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          USAGE: ${{ needs.agent.outputs.usage }}
         run: |
           [ -n "$GH_TOKEN" ] && [ -n "$GREENLIGHT_REPO" ] && [ -n "$GREENLIGHT_ISSUE" ] || exit 0
-          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-            --body "🏭 **Factory ($MODE):** run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          body="🏭 **Factory ($MODE):** run failed: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          if [ -n "$USAGE" ]; then body+=$'\n\n'"$USAGE"; fi
+          gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$body"
           gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building

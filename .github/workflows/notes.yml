@@ -154,6 +154,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       result: ${{ steps.claude.outputs.structured_output }}
+      usage: ${{ steps.usage.outputs.marker }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -186,6 +187,32 @@ jobs:
             --allowedTools "Read"
             --json-schema '{"type":"object","additionalProperties":false,"required":["name","size","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"size":{"type":"string","enum":["S","M","L"]},"body":{"type":"string","minLength":50}}}'
 
+      # What Claude used in this job, as a marker for the stage comment (greenlight-status adds them up). The action
+      # writes its log even when Claude fails or runs out of turns; with no log there is no marker.
+      - name: Token usage
+        id: usage
+        if: always()
+        env:
+          STAGE: scribe
+        run: |
+          f="$RUNNER_TEMP/claude-execution-output.json"
+          [ -s "$f" ] || exit 0
+          marker=$(jq -r --arg stage "$STAGE" '
+            def n: if type == "number" then . else 0 end;
+            def sum(f): map(f | n) | add // 0 | floor;
+            [.[]? | objects | select(.type == "result")] | last // empty
+            | [(.modelUsage // {}) | objects | .[] | objects] as $m
+            | (if ($m | length) > 0
+               then {i: ($m | sum(.inputTokens)), o: ($m | sum(.outputTokens)),
+                     r: ($m | sum(.cacheReadInputTokens)), w: ($m | sum(.cacheCreationInputTokens))}
+               else [.usage // {}] | {i: sum(.input_tokens), o: sum(.output_tokens),
+                     r: sum(.cache_read_input_tokens), w: sum(.cache_creation_input_tokens)}
+               end) as $u
+            | "<!-- greenlight:usage stage=\($stage) in=\($u.i) out=\($u.o) cache_read=\($u.r) cache_write=\($u.w) turns=\(.num_turns | n | floor) cost=\(.total_cost_usd | n | . * 10000 | round / 10000) -->"
+          ' "$f" 2>/dev/null || true)
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "${marker:-no usage recorded}"
+
   publish:
     needs: [read, scribe]
     if: always() && needs.read.outputs.kind == 'idea'
@@ -197,6 +224,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       SCRIBE_RESULT: ${{ needs.scribe.result }}
       SCRIBE_JSON: ${{ needs.scribe.outputs.result }}
+      USAGE: ${{ needs.scribe.outputs.usage }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -208,8 +236,9 @@ jobs:
           set -euo pipefail
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           if [ "$SCRIBE_RESULT" != success ] || [ -z "$SCRIBE_JSON" ]; then
-            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
-              --body "The Scribe could not expand this note ([run]($run_url)). Remove and re-add \`note\` to try again."
+            body="The Scribe could not expand this note ([run]($run_url)). Remove and re-add \`note\` to try again."
+            if [ -n "$USAGE" ]; then body+=$'\n\n'"$USAGE"; fi
+            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" --body "$body"
             exit 1
           fi
           name=$(jq -r '.name' <<<"$SCRIBE_JSON" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-40)
@@ -226,6 +255,7 @@ jobs:
             echo "---"
             echo "_Expanded by the Scribe from your note. Size **${size}**, not scored by the Critic._"
             echo "_Add \`approved\` to send it to the Architect, or \`archived\` to drop it._"
+            if [ -n "$USAGE" ]; then echo; echo "$USAGE"; fi
           } >> "$RUNNER_TEMP/body.md"
           gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --title "[idea] $name" --body-file "$RUNNER_TEMP/body.md" \
             --add-label idea --remove-label note
