@@ -124,6 +124,7 @@ jobs:
     outputs:
       outcome: ${{ steps.claude.outcome }}
       verdict: ${{ steps.claude.outputs.structured_output }}
+      usage: ${{ steps.usage.outputs.marker }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -184,6 +185,32 @@ jobs:
             --allowedTools "Read,Glob,Grep"
             --json-schema '{"type":"object","additionalProperties":false,"required":["verdict","summary","findings"],"properties":{"verdict":{"type":"string","enum":["pass","fail"]},"summary":{"type":"string"},"findings":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["severity","file","problem","fix"],"properties":{"severity":{"type":"string","enum":["blocker","minor"]},"criterion":{"type":"string"},"file":{"type":"string"},"problem":{"type":"string"},"fix":{"type":"string"}}}}}}'
 
+      # What Claude used in this job, as a marker for the stage comment (greenlight-status adds them up). The action
+      # writes its log even when Claude fails or runs out of turns; with no log there is no marker.
+      - name: Token usage
+        id: usage
+        if: always()
+        env:
+          STAGE: inspector
+        run: |
+          f="$RUNNER_TEMP/claude-execution-output.json"
+          [ -s "$f" ] || exit 0
+          marker=$(jq -r --arg stage "$STAGE" '
+            def n: if type == "number" then . else 0 end;
+            def sum(f): map(f | n) | add // 0 | floor;
+            [.[]? | objects | select(.type == "result")] | last // empty
+            | [(.modelUsage // {}) | objects | .[] | objects] as $m
+            | (if ($m | length) > 0
+               then {i: ($m | sum(.inputTokens)), o: ($m | sum(.outputTokens)),
+                     r: ($m | sum(.cacheReadInputTokens)), w: ($m | sum(.cacheCreationInputTokens))}
+               else [.usage // {}] | {i: sum(.input_tokens), o: sum(.output_tokens),
+                     r: sum(.cache_read_input_tokens), w: sum(.cache_creation_input_tokens)}
+               end) as $u
+            | "<!-- greenlight:usage stage=\($stage) in=\($u.i) out=\($u.o) cache_read=\($u.r) cache_write=\($u.w) turns=\(.num_turns | n | floor) cost=\(.total_cost_usd | n | . * 10000 | round / 10000) -->"
+          ' "$f" 2>/dev/null || true)
+          echo "marker=$marker" >> "$GITHUB_OUTPUT"
+          echo "${marker:-no usage recorded}"
+
   decide:
     needs: [checks, review]
     if: >-
@@ -210,6 +237,8 @@ jobs:
       REVIEW_RESULT: ${{ needs.review.result }}
       REVIEW_OUTCOME: ${{ needs.review.outputs.outcome }}
       REVIEW_JSON: ${{ needs.review.outputs.verdict }}
+      # What the review used, as a greenlight:usage marker for the greenlight issue (empty if it never ran).
+      USAGE: ${{ needs.review.outputs.usage }}
     steps:
       - uses: actions/download-artifact@v8
         with:
@@ -296,8 +325,14 @@ jobs:
           export GH_TOKEN="$PAT"
           [ -n "$GH_TOKEN" ] || { echo "::error::Missing secret GREENLIGHT_TOKEN"; exit 1; }
           pr_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/${PR}"
+          # Every report to the greenlight issue carries the usage marker, so each review is counted exactly once.
+          report() {
+            local text="$1"
+            if [ -n "$USAGE" ]; then text+=$'\n\n'"$USAGE"; fi
+            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "$text"
+          }
           stuck() {
-            gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --body "🔍 **Inspector:** $1 ${pr_url}"
+            report "🔍 **Inspector:** $1 ${pr_url}"
             gh issue edit "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" --add-label stuck --remove-label building
           }
 
@@ -307,11 +342,9 @@ jobs:
                 if [ "$IS_DRAFT" = "true" ]; then gh pr ready "$PR" --repo "$GITHUB_REPOSITORY"; fi
                 # Merging with the PAT makes the push to main trigger the Publisher (deploy.yml).
                 gh pr merge "$PR" --repo "$GITHUB_REPOSITORY" --squash --delete-branch --match-head-commit "$HEAD_SHA"
-                gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-                  --body "🔍 **Inspector:** passed and merged ${pr_url}. The Publisher deploys next."
+                report "🔍 **Inspector:** passed and merged ${pr_url}. The Publisher deploys next."
               else
-                gh issue comment "$GREENLIGHT_ISSUE" --repo "$GREENLIGHT_REPO" \
-                  --body "🔍 **Inspector:** passed ${pr_url}. Merge it to deploy (AUTO_MERGE is off)."
+                report "🔍 **Inspector:** passed ${pr_url}. Merge it to deploy (AUTO_MERGE is off)."
               fi
               ;;
             fail)
@@ -321,6 +354,7 @@ jobs:
                   -f "client_payload[greenlight_repo]=$GREENLIGHT_REPO" -f "client_payload[issue]=$GREENLIGHT_ISSUE" \
                   -f "client_payload[change]=$change"
                 echo "Dispatched Factory fix round $round"
+                report "🔍 **Inspector:** round ${round} failed on ${pr_url}, sent back to the Factory (fix round ${round}/${MAX_ROUNDS})."
               else
                 stuck "failed ${MAX_ROUNDS} fix rounds and needs a human."
               fi
