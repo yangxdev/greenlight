@@ -1,6 +1,27 @@
-export type SourceName = 'hn' | 'reddit' | 'github' | 'producthunt' | 'stackexchange' | 'discourse' | 'rss'
+export type SourceName =
+  | 'hn'
+  | 'reddit'
+  | 'github'
+  | 'issues'
+  | 'producthunt'
+  | 'stackexchange'
+  | 'discourse'
+  | 'lemmy'
+  | 'bluesky'
+  | 'rss'
 
-export const SOURCE_NAMES: readonly SourceName[] = ['hn', 'reddit', 'github', 'producthunt', 'stackexchange', 'discourse', 'rss']
+export const SOURCE_NAMES: readonly SourceName[] = [
+  'hn',
+  'reddit',
+  'github',
+  'issues',
+  'producthunt',
+  'stackexchange',
+  'discourse',
+  'lemmy',
+  'bluesky',
+  'rss',
+]
 
 /** One normalised item from any source. This is the Analyst's input record (plus rank fields on export). */
 export interface Signal {
@@ -9,7 +30,7 @@ export interface Signal {
   source: SourceName
   /**
    * Sub-feed: subreddit, feed name, HN tag (`story`, `ask_hn`, `show_hn`, `ask_hn_comment`), repo language,
-   * Stack Exchange site, Discourse forum name.
+   * Stack Exchange site, Discourse forum name, GitHub repo of an issue, Lemmy community, `search` for Bluesky.
    */
   channel: string
   /** Where the discussion lives: HN item, Reddit thread, repo page, Product Hunt post, feed item. */
@@ -69,11 +90,17 @@ export interface ScoutConfig {
   }
   reddit: { enabled: boolean; subreddits: string[]; limit: number; minScore: number }
   github: { enabled: boolean; minStars: number; createdWithinDays: number; perPage: number }
+  /** GitHub issue search. Each query gets `is:issue` and the created window added; results sort by reactions. */
+  issues: { enabled: boolean; queries: string[]; createdWithinDays: number; perPage: number }
   producthunt: { enabled: boolean; limit: number }
   /** `sites` are API site names, e.g. `softwarerecs` for softwarerecs.stackexchange.com. */
   stackexchange: { enabled: boolean; sites: string[]; minScore: number; pageSize: number }
   /** `maxTopics` caps new topics per forum and run: each one costs a request for its opening post. */
   discourse: { enabled: boolean; forums: ForumConfig[]; maxTopics: number }
+  /** Communities as `name@instance`, read from their home instance. */
+  lemmy: { enabled: boolean; communities: string[]; limit: number }
+  /** `service` is the PDS the app password belongs to. `lang` narrows search to one language. */
+  bluesky: { enabled: boolean; service: string; queries: string[]; limit: number; lang: string }
   rss: { enabled: boolean; feeds: FeedConfig[] }
   /** Case-insensitive phrases that suggest someone is describing a problem. Used for ranking only. */
   painPhrases: string[]

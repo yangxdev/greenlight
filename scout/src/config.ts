@@ -83,6 +83,9 @@ export function parseConfig(raw: Json): ScoutConfig {
   const producthunt = obj(c.producthunt, 'producthunt')
   const stackexchange = obj(c.stackexchange, 'stackexchange')
   const discourse = obj(c.discourse, 'discourse')
+  const issues = obj(c.issues, 'issues')
+  const lemmy = obj(c.lemmy, 'lemmy')
+  const bluesky = obj(c.bluesky, 'bluesky')
   const rss = obj(c.rss, 'rss')
   const exp = obj(c.export, 'export')
 
@@ -98,6 +101,18 @@ export function parseConfig(raw: Json): ScoutConfig {
   }
   const pageSize = num(stackexchange.pageSize, 'stackexchange.pageSize', 1)
   if (pageSize > 100) throw new ConfigError('stackexchange.pageSize must be at most 100')
+  const communities = strings(lemmy.communities, 'lemmy.communities')
+  for (const community of communities) {
+    if (!/^[a-z0-9_]+@[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(community)) {
+      throw new ConfigError(`lemmy.communities: "${community}" must be name@instance, like selfhosted@lemmy.world`)
+    }
+  }
+  const service = str(bluesky.service, 'bluesky.service')
+  if (!/^https:\/\/[^/?#]+$/.test(service)) throw new ConfigError("bluesky.service must be an https:// root, with no path or trailing slash")
+  const blueskyLimit = num(bluesky.limit, 'bluesky.limit', 1)
+  if (blueskyLimit > 100) throw new ConfigError('bluesky.limit must be at most 100')
+  const issuesPerPage = num(issues.perPage, 'issues.perPage', 1)
+  if (issuesPerPage > 100) throw new ConfigError('issues.perPage must be at most 100')
   const maxShare = num(exp.maxSharePerSource, 'export.maxSharePerSource')
   if (maxShare > 1) throw new ConfigError('export.maxSharePerSource must be between 0 and 1')
 
@@ -132,6 +147,12 @@ export function parseConfig(raw: Json): ScoutConfig {
       createdWithinDays: num(github.createdWithinDays, 'github.createdWithinDays', 1),
       perPage: num(github.perPage, 'github.perPage', 1),
     },
+    issues: {
+      enabled: bool(issues.enabled, 'issues.enabled'),
+      queries: strings(issues.queries, 'issues.queries'),
+      createdWithinDays: num(issues.createdWithinDays, 'issues.createdWithinDays', 1),
+      perPage: issuesPerPage,
+    },
     producthunt: {
       enabled: bool(producthunt.enabled, 'producthunt.enabled'),
       limit: num(producthunt.limit, 'producthunt.limit', 1),
@@ -146,6 +167,18 @@ export function parseConfig(raw: Json): ScoutConfig {
       enabled: bool(discourse.enabled, 'discourse.enabled'),
       forums: forums(discourse.forums, 'discourse.forums'),
       maxTopics: num(discourse.maxTopics, 'discourse.maxTopics', 1),
+    },
+    lemmy: {
+      enabled: bool(lemmy.enabled, 'lemmy.enabled'),
+      communities,
+      limit: num(lemmy.limit, 'lemmy.limit', 1),
+    },
+    bluesky: {
+      enabled: bool(bluesky.enabled, 'bluesky.enabled'),
+      service,
+      queries: strings(bluesky.queries, 'bluesky.queries'),
+      limit: blueskyLimit,
+      lang: typeof bluesky.lang === 'string' ? bluesky.lang : '',
     },
     rss: { enabled: bool(rss.enabled, 'rss.enabled'), feeds: feeds(rss.feeds, 'rss.feeds') },
     painPhrases: strings(c.painPhrases, 'painPhrases').map((p) => p.toLowerCase()),

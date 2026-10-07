@@ -1,0 +1,48 @@
+{
+  "posts": [
+    {
+      "post": {
+        "id": 7001,
+        "name": "How do you keep track of which containers need updates?",
+        "body": "I check each one **manually** every week. There has to be a better way.",
+        "published": "2026-09-29T07:00:00.000000Z",
+        "ap_id": "https://lemmy.world/post/7001",
+        "nsfw": false,
+        "deleted": false,
+        "removed": false,
+        "featured_community": false,
+        "featured_local": false
+      },
+      "counts": { "score": 54, "comments": 31 }
+    },
+    {
+      "post": {
+        "id": 7002,
+        "name": "Uptime dashboard I made",
+        "url": "https://www.example.com/dash?utm_source=lemmy",
+        "published": "2026-09-29T06:00:00",
+        "ap_id": "https://lemmy.world/post/7002"
+      },
+      "counts": { "score": 12, "comments": 4 }
+    },
+    {
+      "post": {
+        "id": 7003,
+        "name": "Community rules",
+        "published": "2026-09-29T05:00:00.000000Z",
+        "ap_id": "https://lemmy.world/post/7003",
+        "featured_community": true
+      },
+      "counts": { "score": 200, "comments": 0 }
+    },
+    {
+      "post": {
+        "id": 7004,
+        "name": "Older post",
+        "published": "2026-09-27T05:00:00.000000Z",
+        "ap_id": "https://lemmy.world/post/7004"
+      },
+      "counts": { "score": 90, "comments": 40 }
+    }
+  ]
+}

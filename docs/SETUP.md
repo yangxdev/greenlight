@@ -80,7 +80,8 @@ Scout secrets (all optional; the Scout runs without them):
 | `MONGODB_URI` | Atlas connection string (see below) | signals go to a JSONL artifact on each run instead of MongoDB |
 | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | a **script** app at reddit.com/prefs/apps, which needs Reddit's approval first. Greenlight's request was denied on 2026-10-01 ([details](../scout/README.md#reddit-access)) | Reddit is skipped; the other sources still run |
 | `PRODUCTHUNT_TOKEN` | producthunt.com/v2/oauth/applications → developer token | public feed only, with no vote or comment counts |
-| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs about 20 a day for its 18 sites, so a key is recommended |
+| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs about 30 a day for its 26 sites, so a key is recommended |
+| `BLUESKY_IDENTIFIER`, `BLUESKY_APP_PASSWORD` | your Bluesky handle, and an app password from Settings → Privacy and security → App passwords (never the account password) | Bluesky is skipped; Bluesky search needs a logged-in session |
 
 **MongoDB Atlas (free M0):** create an M0 cluster, add a database user limited to read/write on the `greenlight` database,
 and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Copy the `mongodb+srv://…` string into

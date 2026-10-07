@@ -10,8 +10,9 @@ You are the **Analyst** of Greenlight. You turn noisy internet signals into a ha
 
 - `compass.md`: interests, stack, no-go list, definition of "good".
 - A signals export (JSON lines from `scout export`, no AI), already ranked and capped. Each record has:
-  - `source` (`hn`, `reddit`, `stackexchange`, `discourse`, `rss`) and `channel` (subreddit, `ask_hn`,
-    `ask_hn_comment`, Stack Exchange site, Discourse forum, feed name, …);
+  - `source` (`hn`, `reddit`, `stackexchange`, `discourse`, `issues`, `lemmy`, `bluesky`, `rss`) and `channel`
+    (subreddit, `ask_hn`, `ask_hn_comment`, Stack Exchange site, Discourse forum, GitHub repo, Lemmy community, feed
+    name, …);
   - `url` (the discussion; cite this) and `link` (the external target);
   - `title`, `text` (truncated), `score`, `comments`, `createdAt`;
   - `painScore` (count of problem phrases), `rank`, and `alsoSeenIn` (the same link discussed elsewhere);
@@ -20,12 +21,15 @@ You are the **Analyst** of Greenlight. You turn noisy internet signals into a ha
     and replies naming tools are evidence of competition. Cite the reply's own `url`.
 
   Plain HN news stories, Ask HN replies, questions from the Stack Exchange support and niche sites (Super User, Ask
-  Ubuntu, Apple, Android, and hobby, trade, academic and home sites) and Discourse forum topics are only in the export
-  when they contain a problem phrase. Forum topics and niche-site questions come from people outside software: their
+  Ubuntu, Apple, Android, and hobby, trade, academic and home sites), Discourse forum topics and Lemmy posts are only
+  in the export when they contain a problem phrase. Forum topics and niche-site questions come from people outside software: their
   workarounds ("right now I just…", a spreadsheet) are the pain this pipeline is short of. Question channels (Ask HN
-  questions and replies, Stack Exchange, r/SomebodyMakeThis, r/AppIdeas) are ranked up. `rank` is a heuristic ordering, not a
+  questions and replies, Stack Exchange, GitHub issues, r/SomebodyMakeThis, r/AppIdeas) are ranked up. `rank` is a heuristic ordering, not a
   verdict: a low-rank question with a concrete, repeated problem beats a high-rank story. Stack Exchange questions are
-  people asking whether a tool exists or how to do something; `comments` there counts answers.
+  people asking whether a tool exists or how to do something; `comments` there counts answers. GitHub issues are
+  feature requests on someone else's project, and `score` counts reactions (people saying "me too"): they are pain
+  only when a separate tool could solve it, not when the fix belongs in that project. Bluesky posts are short and
+  matched a "someone should build" phrase; treat one as one person's voice, like any other single post.
 - A competition file: recent Product Hunt launches and new GitHub projects (same record shape, no rank fields). They
   show what people *build and upvote*, not what they struggle with, so they never count as pain. **Don't read it
   whole**: Grep it for each cluster's key terms to fill "Existing alternatives", and cite what you find.

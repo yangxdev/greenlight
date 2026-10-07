@@ -12,7 +12,8 @@ the whole pipeline in 16 minutes of machine time.
 ## What it does
 
 1. **Scout** (daily, no AI) collects posts where people describe a problem: Hacker News, Stack Exchange, Discourse
-   forums, Lobsters, plus Product Hunt and GitHub launches as a competition check.
+   forums, GitHub feature requests, Lemmy, Bluesky and Lobsters, plus Product Hunt and GitHub launches as a
+   competition check.
 2. **Analyst** (weekly) clusters them into idea cards. **Critic** checks every quote against the sources, scores the
    cards on four criteria, estimates each one's size, and files at most three as GitHub issues. Most ideas die here;
    near misses go on a [watchlist](analysis/watchlist.md) until more evidence turns up.

@@ -203,7 +203,7 @@ templates/                  idea.md, blueprint.md, change.md, weekly-report.md (
 analysis/                   weekly idea cards, Critic verdicts and the near-miss watchlist, committed by ideas.yml
 observer/                   Observer data scripts: uptime probes, Web Analytics, weekly metrics.json (see ../observer/README.md)
 reports/                    weekly reports (<week>.md) and verdicts (<week>.json), committed by observer.yml
-scout/                      Scout: HN, Reddit, GitHub, Product Hunt, Stack Exchange, Discourse, RSS fetchers + ranked export (see ../scout/README.md)
+scout/                      Scout: HN, Reddit, GitHub, GitHub issues, Product Hunt, Stack Exchange, Discourse, Lemmy, Bluesky, RSS fetchers + ranked export (see ../scout/README.md)
   config.json               subreddits, feeds, thresholds, pain phrases
 template/                   product skeleton copied into every new product repo
   .greenlight/owned         the files template sync keeps up to date (the scaffold adds .greenlight/template)

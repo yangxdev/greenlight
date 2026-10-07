@@ -81,7 +81,7 @@ describe('scout fetch', () => {
 
     const signals = await readJsonl<Signal>(out)
     const sources = new Set(signals.map((s) => s.source))
-    expect([...sources].sort()).toEqual(['discourse', 'github', 'hn', 'producthunt', 'reddit', 'rss', 'stackexchange'])
+    expect([...sources].sort()).toEqual(['discourse', 'github', 'hn', 'issues', 'lemmy', 'producthunt', 'reddit', 'rss', 'stackexchange'])
     // Every subreddit returns the same fixture here; duplicates collapse by id.
     expect(signals.filter((s) => s.source === 'reddit')).toHaveLength(2)
     expect(new Set(signals.map((s) => s.id)).size).toBe(signals.length)
@@ -139,7 +139,9 @@ describe('scout export', () => {
   it('ranks signals from a JSONL file for the Analyst', async () => {
     const raw = join(dir, 'signals.jsonl')
     const out = join(dir, 'analyst.jsonl')
-    await main(['fetch', '--out', raw, '--config', await redditReadyConfig()], deps({ env: REDDIT_ENV }))
+    // The sources the merge case needs; the others would only crowd the top 6.
+    const sources = 'hn,reddit,github,producthunt,stackexchange,discourse,rss'
+    await main(['fetch', '--out', raw, '--sources', sources, '--config', await redditReadyConfig()], deps({ env: REDDIT_ENV }))
     const d = deps()
     expect(await main(['export', '--from', raw, '--out', out, '--limit', '6'], d)).toBe(0)
 

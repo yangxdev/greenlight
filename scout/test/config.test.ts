@@ -51,6 +51,15 @@ describe('config', () => {
     expect(() => parseConfig(c)).toThrow('discourse.forums[0].name must be lowercase letters, digits and dashes')
   })
 
+  it('rejects Lemmy communities without their instance, and a Bluesky service with a path', () => {
+    const c = raw()
+    c.lemmy = { ...c.lemmy, communities: ['selfhosted'] }
+    expect(() => parseConfig(c)).toThrow('lemmy.communities: "selfhosted" must be name@instance')
+    const d = raw()
+    d.bluesky = { ...d.bluesky, service: 'https://bsky.social/xrpc' }
+    expect(() => parseConfig(d)).toThrow('bluesky.service must be an https:// root')
+  })
+
   it('rejects feeds without an http(s) URL', () => {
     const c = raw()
     c.rss = { ...c.rss, feeds: [{ name: 'x', url: 'file:///etc/passwd' }] }
