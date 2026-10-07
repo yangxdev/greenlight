@@ -182,6 +182,7 @@ jobs:
             - templates/idea.md: the idea card format
             - reports/*.md: the most recent weekly report, if the folder exists
             - analysis/watchlist.md: earlier near misses to check this week's signals against
+            - analysis/field-notes.md: complaints the owner read at the source and wrote down, if the file exists
 
             Output: write analysis/${{ needs.export.outputs.date }}.md. Do not create or modify any other file.
           claude_args: >-
@@ -242,6 +243,7 @@ jobs:
             - .greenlight-run/existing-ideas.md: idea issues that already exist
             - templates/idea.md: the card format for each returned idea's body
             - analysis/watchlist.md: earlier near misses and the evidence already verified for them
+            - analysis/field-notes.md: evidence the owner verified at the source, if the file exists
 
             Write analysis/${{ needs.export.outputs.date }}-critic.md, update analysis/watchlist.md, then return the
             structured result. Do not create or modify any other file.

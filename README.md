@@ -17,7 +17,8 @@ the whole pipeline in 16 minutes of machine time.
 2. **Analyst** (weekly) clusters them into idea cards. **Critic** checks every quote against the sources, scores the
    cards on four criteria, estimates each one's size, and files at most three as GitHub issues. Most ideas die here;
    near misses go on a [watchlist](analysis/watchlist.md) until more evidence turns up.
-3. **You** add `approved` to an idea you want.
+3. **You** add `approved` to an idea you want, or jot down your own with a quick note, which the **Scribe** turns into
+   a full card.
 4. **Architect** creates the product repo and writes a blueprint of at most 10 tasks. A **Reviewer** with a fresh
    context checks and repairs it.
 5. **You** add `blueprint-ok`. This is the one decision that spends a build.
