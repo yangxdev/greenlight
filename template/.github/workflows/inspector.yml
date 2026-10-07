@@ -42,6 +42,11 @@ jobs:
       test: ${{ steps.test.outcome }}
       build: ${{ steps.build.outcome }}
       audit: ${{ steps.audit.outcome }}
+    # Every check pipes into tee for the logs. Without an explicit shell, GitHub runs `bash -e` with no pipefail, so
+    # a step would take tee's exit code and pass even when its command failed. `shell: bash` adds `-o pipefail`.
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v7
         with:
