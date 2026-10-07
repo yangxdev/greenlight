@@ -12,9 +12,9 @@
 
 <The first 100 users and the community where they hang out.>
 
-### MVP in one day
+### MVP
 
-- <3–6 bullets: the smallest thing that proves value>
+- <3–6 bullets: the smallest first version that proves the value>
 
 ### Existing alternatives
 
@@ -28,6 +28,11 @@
 
 - <what v1 will not do>
 
+### Size
+
+<!-- Filled by the Critic. S (about 6 tasks or fewer), M (7–10 tasks, one build), or L (a first build, then
+     follow-up changes). One line on what drives it; for L, the first build and the follow-up changes in order. -->
+
 ### Critic score
 
 <!-- Filled by the Critic (phase 3). Leave empty for hand-written ideas. -->
@@ -35,6 +40,6 @@
 |-----------|-------------|-----|
 | Real pain | | |
 | Competition gap | | |
-| One-day MVP in stack | | |
+| Buildable | | |
 | Reachable users | | |
 | **Total** | **/20** | |

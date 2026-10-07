@@ -13,9 +13,10 @@ the usage budget and the security model. To run your own copy, see [SETUP.md](SE
      Product Hunt launches and new GitHub projects (searched, not read whole), and the existing idea titles;
    - the **Analyst** (AI, about 20 turns) writes idea cards to `analysis/<date>.md`;
    - the **Critic** (AI, fresh context, about 15 turns) checks the cards' evidence against the signals and scores them
-     on the compass rubric. It writes `analysis/<date>-critic.md` and returns a JSON verdict. Cards scoring 11–13 go
-     on `analysis/watchlist.md` with their verified evidence; the next weeks' Analysts check new signals against it,
-     so a problem that comes up once a month can still add up to a filed idea. Delete an entry to stop watching it;
+     on the compass rubric, and estimates each card's size (S, M or L) without scoring it. It writes
+     `analysis/<date>-critic.md` and returns a JSON verdict. Cards scoring 11–13 go on `analysis/watchlist.md` with
+     their verified evidence; the next weeks' Analysts check new signals against it, so a problem that comes up once a
+     month can still add up to a filed idea. Delete an entry to stop watching it;
    - `publish` (no AI) commits `analysis/` and files at most `CRITIC_MAX_IDEAS` (3) issues scoring at least
      `CRITIC_MIN_SCORE` (14/20), skipping titles that already exist and defusing @mentions.
    It never adds `approved`, and bot-filed issues trigger nothing.

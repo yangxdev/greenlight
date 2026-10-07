@@ -64,7 +64,8 @@ restyle it.
 - €0 beyond the Claude Pro plan. Free tiers only: GitHub, Cloudflare (Pages/Workers/R2/D1), MongoDB Atlas M0.
 - No paid APIs, no API keys that bill per call, no paid domains (use `*.workers.dev`).
 - Never Render.com: its free hours are per workspace and already spent on waypoint and kiroku.
-- The MVP must fit about one day of Factory work: at most 10 tasks and 3 screens.
+- Each Factory build fits about one day of work: at most 10 tasks and 3 screens. A bigger idea ships a first
+  version of that size, then grows through change requests (1–5 tasks each).
 
 ## No-go list (never build)
 
@@ -86,7 +87,8 @@ An idea is good when **all** of these hold:
 1. **Real pain:** people describe the problem in their own words, repeatedly, in public (links, not vibes).
 2. **Reachable users:** I can name a community of the first 100 users and post there for free.
 3. **Weak competition:** alternatives are missing, overpriced, bloated, or ignore a niche.
-4. **One-day MVP:** it fits the stack above, the free tiers, and 10 tasks.
+4. **Buildable:** it fits the stack above and the free tiers, and a first version that proves the value fits one
+   Factory build. How big the whole idea is gets estimated, not scored: a promising idea may take several builds.
 5. **Measurable:** "success" can be observed with Cloudflare Web Analytics within 2 weeks (visits, a key action).
 
 Prefer: single-purpose tools, calculators/converters/checkers, niche utilities for a professional community,

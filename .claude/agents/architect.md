@@ -23,6 +23,8 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
 
 1. **Cut scope hard.** Target about one day of Factory work. Pick the single core flow that proves the value, and
    move everything else to Non-goals. Max 3 screens. Nothing that needs accounts, payments or paid APIs.
+   When the idea's Size is L, blueprint only the first build it names and list its follow-up changes under
+   Non-goals as later changes.
 2. **Prefer no storage.** Use `localStorage` or static data unless the core flow needs server persistence.
    If it does, use MongoDB for records and R2 for files, and say exactly which collections and prefixes.
 3. **Design for the Factory.** Every task names the files it touches, is completable in under about an hour,

@@ -249,7 +249,7 @@ jobs:
             --max-turns ${{ vars.CRITIC_MAX_TURNS || '25' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
-            --json-schema '{"type":"object","additionalProperties":false,"required":["summary","ideas"],"properties":{"summary":{"type":"string"},"ideas":{"type":"array","maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["name","scores","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"scores":{"type":"object","additionalProperties":false,"required":["pain","competition","mvp","reach"],"properties":{"pain":{"type":"integer","minimum":0,"maximum":5},"competition":{"type":"integer","minimum":0,"maximum":5},"mvp":{"type":"integer","minimum":0,"maximum":5},"reach":{"type":"integer","minimum":0,"maximum":5}}},"body":{"type":"string","minLength":50}}}}}}'
+            --json-schema '{"type":"object","additionalProperties":false,"required":["summary","ideas"],"properties":{"summary":{"type":"string"},"ideas":{"type":"array","maxItems":3,"items":{"type":"object","additionalProperties":false,"required":["name","scores","size","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"scores":{"type":"object","additionalProperties":false,"required":["pain","competition","mvp","reach"],"properties":{"pain":{"type":"integer","minimum":0,"maximum":5},"competition":{"type":"integer","minimum":0,"maximum":5},"mvp":{"type":"integer","minimum":0,"maximum":5},"reach":{"type":"integer","minimum":0,"maximum":5}}},"size":{"type":"string","enum":["S","M","L"]},"body":{"type":"string","minLength":50}}}}}}'
 
       # Both files sit in analysis/, so the artifact keeps their names and the publish job restores them there.
       - uses: actions/upload-artifact@v7
@@ -325,6 +325,7 @@ jobs:
             name=$(jq -r '.name' <<<"$idea" | tr -d '\r\n' | cut -c1-60)
             read -r pain competition mvp reach < <(jq -r '.scores | "\(.pain) \(.competition) \(.mvp) \(.reach)"' <<<"$idea")
             total=$((pain + competition + mvp + reach))
+            size=$(jq -r '.size' <<<"$idea")
             title="[idea] $name"
             if [ "$total" -lt "$MIN_SCORE" ]; then echo "Skipped (score $total < $MIN_SCORE): $title"; continue; fi
             if [ "${#filed[@]}" -ge "$MAX_IDEAS" ]; then echo "Cap of $MAX_IDEAS reached"; break; fi
@@ -334,7 +335,7 @@ jobs:
             {
               echo
               echo "---"
-              echo "_Filed by the Critic from [analysis/${DATE}.md](${analysis_url}). Score **${total}/20** (pain ${pain}, competition ${competition}, MVP ${mvp}, reach ${reach})._"
+              echo "_Filed by the Critic from [analysis/${DATE}.md](${analysis_url}). Score **${total}/20** (pain ${pain}, competition ${competition}, build ${mvp}, reach ${reach}), size **${size}**._"
               echo "_Add \`approved\` to send it to the Architect, or \`archived\` to drop it._"
             } >> "$RUNNER_TEMP/body.md"
             url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label idea --body-file "$RUNNER_TEMP/body.md")
