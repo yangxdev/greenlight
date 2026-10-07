@@ -20,7 +20,7 @@ export interface Deps {
 const DEFAULT_CONFIG = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'config.json')
 
 const USAGE = `Usage:
-  node src/cli.ts fetch  [--sources hn,reddit,github,producthunt,stackexchange,discourse,rss] [--days N] [--out signals.jsonl] [--config config.json]
+  node src/cli.ts fetch  [--sources hn,reddit,github,issues,producthunt,stackexchange,discourse,lemmy,bluesky,rss] [--days N] [--out signals.jsonl] [--config config.json]
   node src/cli.ts export --out analyst-input.jsonl [--context-out competition.jsonl] [--days N] [--limit N] [--from signals.jsonl] [--config config.json]
 
 fetch  stores signals in MongoDB (MONGODB_URI, MONGODB_DB), or in a JSONL file with --out.
@@ -61,7 +61,7 @@ async function fetchCommand(args: string[], deps: Deps): Promise<number> {
   const uri = deps.env.MONGODB_URI
   if (!values.out && !uri) throw new UsageError('set MONGODB_URI or pass --out <file.jsonl>')
   // A one-off backfill. HN and Stack Exchange page back that far; Product Hunt stops at its limit, feeds only
-  // carry recent items, and GitHub keeps its own createdWithinDays window.
+  // carry recent items, GitHub repos keep their createdWithinDays window, and GitHub issues take the longer of the two.
   const days = positiveInt(values.days, '--days')
   if (days !== undefined) {
     deps.log(`looking back ${days} days instead of ${config.lookbackHours} hours`)

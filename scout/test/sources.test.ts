@@ -1,12 +1,16 @@
 import { describe, expect, it } from 'vitest'
+import { bluesky } from '../src/sources/bluesky.ts'
 import { discourse } from '../src/sources/discourse.ts'
 import { github } from '../src/sources/github.ts'
 import { hn } from '../src/sources/hn.ts'
+import { issues } from '../src/sources/issues.ts'
+import { lemmy } from '../src/sources/lemmy.ts'
 import { producthunt } from '../src/sources/producthunt.ts'
 import { reddit } from '../src/sources/reddit.ts'
 import { rss } from '../src/sources/rss.ts'
 import { stackexchange } from '../src/sources/stackexchange.ts'
 import {
+  BLUESKY_ENV,
   NOW,
   configWith,
   fakeFetch,
@@ -402,6 +406,149 @@ describe('discourse', () => {
 
     const down = fakeFetch(() => new Response('unavailable', { status: 503 }))
     await expect(discourse.fetch(makeCtx(down, { config: two }))).rejects.toThrow('all forums failed')
+  })
+})
+
+describe('issues', () => {
+  it('searches recent issues by reactions, skips pull requests and keys the channel by repo', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const signals = await issues.fetch(makeCtx(f, { env: { GITHUB_TOKEN: 'ghs_test' } }))
+
+    const queries = f.calls.map((c) => new URL(c.url).searchParams.get('q'))
+    expect(queries[0]).toBe('is:issue label:"feature request" reactions:>=10 created:>=2026-09-22')
+    expect(queries).toHaveLength(3)
+    expect(new URL(f.calls[0]?.url ?? '').searchParams.get('sort')).toBe('reactions')
+    expect(header(f.calls[0], 'authorization')).toBe('Bearer ghs_test')
+    // Every query returns the same fixture here; the CLI collapses duplicates by id.
+    expect([...new Set(signals.map((s) => s.id))]).toEqual(['issues:990001', 'issues:990003'])
+    expect(signals[0]).toEqual({
+      id: 'issues:990001',
+      source: 'issues',
+      channel: 'acme/notes',
+      url: 'https://github.com/acme/notes/issues/412',
+      link: 'https://github.com/acme/notes/issues/412',
+      title: 'Feature request: export a notebook as a single PDF',
+      text: '### Is your feature request related to a problem?\nRight now I just print every note by hand & merge them.\nLabels: feature request',
+      score: 48,
+      comments: 9,
+      createdAt: '2026-09-27T10:00:00.000Z',
+    })
+    expect(signals[1]).toMatchObject({ channel: 'other/cal', text: '', score: 0 })
+  })
+
+  it('widens the created window for a backfill', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const backfill = configWith((c) => void (c.lookbackHours = 30 * 24))
+    await issues.fetch(makeCtx(f, { config: backfill }))
+    expect(new URL(f.calls[0]?.url ?? '').searchParams.get('q')).toContain('created:>=2026-08-30')
+  })
+
+  it('skips a failing query but fails when all of them fail', async () => {
+    const f = fakeFetch((url) => (url.searchParams.get('q')?.includes('enhancement') ? json({ message: 'bad' }, 422) : fixtureRoutes(url)))
+    const ctx = makeCtx(f)
+    expect((await issues.fetch(ctx)).length).toBeGreaterThan(0)
+    expect(ctx.logs.some((l) => l.startsWith('issues: skipped "label:enhancement reactions:>=10": HTTP 422'))).toBe(true)
+
+    await expect(issues.fetch(makeCtx(fakeFetch(() => json({}, 403))))).rejects.toThrow('all queries failed')
+  })
+})
+
+describe('lemmy', () => {
+  const oneCommunity = configWith((c) => void (c.lemmy.communities = ['selfhosted@lemmy.world']))
+
+  it('keeps new, listed posts from the home instance and treats zoneless timestamps as UTC', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const signals = await lemmy.fetch(makeCtx(f, { config: oneCommunity }))
+
+    expect(f.calls.map((c) => c.url)).toEqual([
+      'https://lemmy.world/api/v3/post/list?community_name=selfhosted&sort=New&type_=All&limit=50&page=1',
+    ])
+    expect(signals.map((s) => s.id)).toEqual(['lemmy:selfhosted@lemmy.world:7001', 'lemmy:selfhosted@lemmy.world:7002'])
+    expect(signals[0]).toEqual({
+      id: 'lemmy:selfhosted@lemmy.world:7001',
+      source: 'lemmy',
+      channel: 'selfhosted@lemmy.world',
+      url: 'https://lemmy.world/post/7001',
+      link: 'https://lemmy.world/post/7001',
+      title: 'How do you keep track of which containers need updates?',
+      text: 'I check each one **manually** every week. There has to be a better way.',
+      score: 54,
+      comments: 31,
+      createdAt: '2026-09-29T07:00:00.000Z',
+    })
+    expect(signals[1]).toMatchObject({ link: 'https://example.com/dash', createdAt: '2026-09-29T06:00:00.000Z', text: '' })
+  })
+
+  it('pages while every post is new', async () => {
+    const posts = JSON.parse(fixture('lemmy-posts.json')).posts
+    const fresh = posts[0]
+    const f = fakeFetch((url) => {
+      const page = Number(url.searchParams.get('page'))
+      if (page === 1) return json({ posts: [fresh, { ...fresh, post: { ...fresh.post, id: 7100 } }] })
+      return json({ posts: [posts[3]] })
+    })
+    const small = configWith((c) => {
+      c.lemmy.communities = ['selfhosted@lemmy.world']
+      c.lemmy.limit = 2
+    })
+    const signals = await lemmy.fetch(makeCtx(f, { config: small }))
+    expect(f.calls).toHaveLength(2)
+    expect(signals.map((s) => s.id)).toEqual(['lemmy:selfhosted@lemmy.world:7001', 'lemmy:selfhosted@lemmy.world:7100'])
+  })
+
+  it('skips a failing community but fails when all of them fail', async () => {
+    const ctx = makeCtx(fakeFetch(fixtureRoutes))
+    expect((await lemmy.fetch(ctx)).length).toBeGreaterThan(0)
+    expect(ctx.logs.some((l) => l.startsWith('lemmy: skipped privacy@lemmy.ml: HTTP 404'))).toBe(true)
+
+    await expect(lemmy.fetch(makeCtx(fakeFetch(() => undefined)))).rejects.toThrow('all communities failed')
+  })
+})
+
+describe('bluesky', () => {
+  const oneQuery = configWith((c) => void (c.bluesky.queries = ['"is there an app"']))
+
+  it('logs in with the app password, searches, and links posts by DID', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const signals = await bluesky.fetch(makeCtx(f, { config: oneQuery, env: BLUESKY_ENV }))
+
+    expect(f.calls[0]?.init?.method).toBe('POST')
+    expect(JSON.parse(String(f.calls[0]?.init?.body))).toEqual({ identifier: 'me.bsky.social', password: 'abcd-efgh-ijkl-mnop' })
+    const search = new URL(f.calls[1]?.url ?? '')
+    expect(search.searchParams.get('q')).toBe('"is there an app"')
+    expect(search.searchParams.get('sort')).toBe('latest')
+    expect(search.searchParams.get('since')).toBe('2026-09-28T10:00:00.000Z')
+    expect(search.searchParams.get('lang')).toBe('en')
+    expect(header(f.calls[1], 'authorization')).toBe('Bearer jwt')
+
+    // The second post's author hides from logged-out users, so it stays out of the public cards.
+    expect(signals).toEqual([
+      {
+        id: 'bluesky:did:plc:aaa111/app.bsky.feed.post/3kpost1',
+        source: 'bluesky',
+        channel: 'search',
+        url: 'https://bsky.app/profile/did:plc:aaa111/post/3kpost1',
+        link: 'https://bsky.app/profile/did:plc:aaa111/post/3kpost1',
+        title: 'Is there an app that tells me which houseplants I forgot to water?',
+        text: 'Is there an app that tells me which houseplants I forgot to water?\nA spreadsheet is not cutting it.',
+        score: 14,
+        comments: 6,
+        createdAt: '2026-09-29T09:00:00.000Z',
+      },
+    ])
+  })
+
+  it('is skipped, not failed, without credentials, and makes no requests', async () => {
+    const f = fakeFetch(fixtureRoutes)
+    const ctx = makeCtx(f, { config: oneQuery })
+    expect(await bluesky.fetch(ctx)).toEqual([])
+    expect(f.calls).toHaveLength(0)
+    expect(ctx.logs.join('\n')).toContain('bluesky: skipped')
+  })
+
+  it('fails when the login is refused', async () => {
+    const f = fakeFetch(() => json({ error: 'AuthenticationRequired' }, 401))
+    await expect(bluesky.fetch(makeCtx(f, { config: oneQuery, env: BLUESKY_ENV }))).rejects.toThrow('HTTP 401')
   })
 })
 

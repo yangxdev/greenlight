@@ -22,6 +22,8 @@ export function configWith(patch: (c: ScoutConfig) => void): ScoutConfig {
 
 /** Credentials and a filled-in user agent: what the reddit source needs before it makes any request. */
 export const REDDIT_ENV = { REDDIT_CLIENT_ID: 'id', REDDIT_CLIENT_SECRET: 'secret' }
+/** An app password: what the bluesky source needs before it makes any request. */
+export const BLUESKY_ENV = { BLUESKY_IDENTIFIER: 'me.bsky.social', BLUESKY_APP_PASSWORD: 'abcd-efgh-ijkl-mnop' }
 export const TEST_USER_AGENT = 'test:greenlight-scout:0.1.0 (by /u/tester)'
 
 export interface Call {
@@ -62,7 +64,14 @@ export function fixtureRoutes(url: URL): Response | undefined {
     return json({ access_token: 'tok', token_type: 'bearer', expires_in: 86400 })
   }
   if (url.hostname === 'oauth.reddit.com' && url.pathname.endsWith('/top')) return json(fixture('reddit-smallbusiness.json'))
+  if (url.hostname === 'api.github.com' && url.pathname === '/search/issues') return json(fixture('github-issues.json'))
   if (url.hostname === 'api.github.com') return json(fixture('github-search.json'))
+  // The lemmy.world communities of the shipped config answer; the lemmy.ml ones are skipped as failing.
+  if (url.hostname === 'lemmy.world' && url.pathname === '/api/v3/post/list') return json(fixture('lemmy-posts.json'))
+  if (url.hostname === 'bsky.social' && url.pathname === '/xrpc/com.atproto.server.createSession') {
+    return json({ accessJwt: 'jwt', did: 'did:plc:me' })
+  }
+  if (url.hostname === 'bsky.social' && url.pathname === '/xrpc/app.bsky.feed.searchPosts') return json(fixture('bluesky-search.json'))
   if (url.hostname === 'api.stackexchange.com') return json(fixture('stackexchange-softwarerecs.json'))
   if (url.hostname === 'www.producthunt.com' && url.pathname === '/feed') return xml(fixture('producthunt-feed.xml'))
   if (url.hostname === 'lobste.rs') return xml(fixture('rss-lobsters.xml'))

@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       sources:
-        description: Comma-separated subset (hn,reddit,github,producthunt,stackexchange,discourse,rss). Empty means all enabled.
+        description: Comma-separated subset (hn,reddit,github,issues,producthunt,stackexchange,discourse,lemmy,bluesky,rss). Empty means all enabled.
         required: false
       days:
         description: One-off backfill, look back this many days (1-30). Empty means the normal daily window.
@@ -62,6 +62,8 @@ jobs:
           REDDIT_CLIENT_SECRET: ${{ secrets.REDDIT_CLIENT_SECRET }}
           PRODUCTHUNT_TOKEN: ${{ secrets.PRODUCTHUNT_TOKEN }}
           STACKEXCHANGE_KEY: ${{ secrets.STACKEXCHANGE_KEY }}
+          BLUESKY_IDENTIFIER: ${{ secrets.BLUESKY_IDENTIFIER }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
           GITHUB_TOKEN: ${{ github.token }}
           SOURCES: ${{ inputs.sources }}
           DAYS: ${{ inputs.days }}

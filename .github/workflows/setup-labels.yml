@@ -20,6 +20,7 @@ jobs:
           while IFS='|' read -r name color description; do
             gh label create "$name" --color "$color" --description "$description" --force
           done <<'LABELS'
+          note|f9d0c4|Kind: a quick note; notes.yml turns it into an idea card or a field note
           idea|c5def5|State: new idea card, waiting for human review
           approved|0e8a16|Gate (human): idea approved, Architect writes the blueprint
           blueprint-ready|fbca04|State: blueprint committed to the product repo, waiting for human review

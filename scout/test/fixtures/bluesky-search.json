@@ -1,0 +1,23 @@
+{
+  "posts": [
+    {
+      "uri": "at://did:plc:aaa111/app.bsky.feed.post/3kpost1",
+      "cid": "bafy1",
+      "author": { "did": "did:plc:aaa111", "handle": "someone.bsky.social", "labels": [] },
+      "record": { "text": "Is there an app that tells me which houseplants I forgot to water?\nA spreadsheet is not cutting it.", "createdAt": "2026-09-29T09:00:00.000Z" },
+      "likeCount": 14,
+      "replyCount": 6,
+      "repostCount": 1,
+      "indexedAt": "2026-09-29T09:00:01.000Z"
+    },
+    {
+      "uri": "at://did:plc:bbb222/app.bsky.feed.post/3kpost2",
+      "cid": "bafy2",
+      "author": { "did": "did:plc:bbb222", "handle": "private.bsky.social", "labels": [{ "val": "!no-unauthenticated" }] },
+      "record": { "text": "is there an app for this", "createdAt": "2026-09-29T08:00:00.000Z" },
+      "likeCount": 3,
+      "replyCount": 0,
+      "indexedAt": "2026-09-29T08:00:01.000Z"
+    }
+  ]
+}

@@ -27,8 +27,8 @@ body:
   - type: textarea
     id: mvp
     attributes:
-      label: MVP in one day
-      description: The smallest thing that proves the value. 3–6 bullet points.
+      label: MVP
+      description: The smallest first version that proves the value. 3–6 bullet points.
       placeholder: |
         - Upload a CSV glossary per client (R2)
         - Paste text, highlight glossary terms

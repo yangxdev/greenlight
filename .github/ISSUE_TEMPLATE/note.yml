@@ -1,0 +1,33 @@
+name: Quick note
+description: Jot down an idea, or a complaint you saw somewhere. An idea becomes a full card; evidence goes to the field notes.
+title: "[note] "
+labels: ["note"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      description: >-
+        Idea: the Scribe expands it into an idea card for you to approve. Evidence: someone else's complaint you read
+        (on Reddit, Discord, anywhere), added to the field notes the Analyst reads every week.
+      options:
+        - Idea
+        - Evidence
+      default: 0
+    validations:
+      required: true
+  - type: textarea
+    id: note
+    attributes:
+      label: Note
+      description: >-
+        Idea: the problem and what you'd build, in your own words. Evidence: what the person said (quote it) and who
+        they are.
+      placeholder: Bike shops keep service history on paper cards, so nobody knows when a customer's chain was last changed…
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Links
+      description: One per line. The thread or post itself, not a search page.

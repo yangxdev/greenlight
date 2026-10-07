@@ -1,0 +1,232 @@
+# Notes: a quick note is an issue labelled `note`, filed with the Quick note form or from the dashboard. By its kind:
+#   Idea      the Scribe expands it into the idea card format; the issue becomes an `idea` waiting for `approved`.
+#   Evidence  someone else's complaint the owner read at the source. It is appended to analysis/field-notes.md, which
+#             the Analyst and Critic read every week, and the issue is closed.
+#
+# Only the owner's notes are read, so nobody else's text reaches an agent.
+#   read      (no AI, no PAT)          parse the note, upload it as an artifact
+#   evidence  (no AI, GITHUB_TOKEN)    append to field-notes.md, commit, close the issue
+#   scribe    (AI, no PAT)             Claude writes the card, returned as JSON
+#   publish   (no AI, GITHUB_TOKEN)    rewrite the issue as the card and relabel it
+name: Notes
+
+on:
+  issues:
+    # The form adds `note` as it creates the issue; both events can arrive, and the second finds the work done.
+    types: [opened, labeled]
+
+concurrency:
+  group: notes-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  ISSUE: ${{ github.event.issue.number }}
+
+jobs:
+  read:
+    if: >-
+      github.actor == github.repository_owner &&
+      ((github.event.action == 'labeled' && github.event.label.name == 'note') ||
+       (github.event.action == 'opened' && contains(github.event.issue.labels.*.name, 'note')))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: read
+    outputs:
+      kind: ${{ steps.parse.outputs.kind }}
+    steps:
+      - name: Parse the note
+        id: parse
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          issue=$(gh issue view "$ISSUE" --repo "$GITHUB_REPOSITORY" --json title,body,labels,state)
+          if ! jq -e '.state == "OPEN" and any(.labels[]; .name == "note")' <<<"$issue" > /dev/null; then
+            echo "Already handled"; echo "kind=none" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          body=$(jq -r '.body // ""' <<<"$issue" | tr -d '\r')
+          # One "### <name>" section of the form's body, without blank edge lines or the form's "_No response_".
+          section() {
+            awk -v h="### $1" '$0 == h {f=1; next} /^### / {f=0} f' <<<"$body" \
+              | sed '/^_No response_$/d' | sed -e '/./,$!d' | tac | sed -e '/./,$!d' | tac
+          }
+          kind=$(section Kind | head -n1 | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')
+          [ "$kind" = evidence ] || kind=idea
+          note=$(section Note)
+          # A note typed without the form's headings is all note.
+          [ -n "$note" ] || note=$body
+          links=$(section Links | grep -oE 'https?://[^[:space:]<>()]+' || true)
+          title=$(jq -r '.title' <<<"$issue" | sed -E 's/^\[note\][[:space:]]*//I')
+          [ -n "$note" ] || { echo "::error::The note is empty"; exit 1; }
+
+          mkdir -p "$RUNNER_TEMP/note"
+          {
+            echo "# ${title:-Untitled note}"
+            echo
+            echo "## Note"
+            echo
+            echo "$note"
+            echo
+            echo "## Links"
+            echo
+            if [ -n "$links" ]; then echo "$links"; else echo "none"; fi
+          } > "$RUNNER_TEMP/note/note.md"
+          printf '%s\n' "$note" > "$RUNNER_TEMP/note/text.md"
+          printf '%s\n' "$links" > "$RUNNER_TEMP/note/links.txt"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "Kind: $kind"
+
+      - uses: actions/upload-artifact@v7
+        if: steps.parse.outputs.kind != 'none'
+        with:
+          name: note
+          path: ${{ runner.temp }}/note
+          retention-days: 7
+
+  evidence:
+    needs: read
+    if: needs.read.outputs.kind == 'evidence'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # This job runs no repository code (only git and gh), so the checkout may keep its token for the push.
+      - uses: actions/checkout@v7
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: note
+          path: ${{ runner.temp }}/note
+
+      - name: Append to the field notes
+        run: |
+          set -euo pipefail
+          file=analysis/field-notes.md
+          if [ ! -f "$file" ]; then
+            cat > "$file" <<'INTRO'
+          # Field notes
+
+          Complaints the owner read at the source and wrote down with the Quick note form (kind: Evidence), often from
+          places the Scout can't read, such as Reddit. `notes.yml` adds them, newest last. The Analyst reads the entries
+          of the last 60 days as signals, and the Critic accepts them as verified evidence. Delete an entry to withdraw it.
+          INTRO
+          fi
+          links=$(grep . "$RUNNER_TEMP/note/links.txt" | paste -sd ' ' - | sed 's/ /, /g' || true)
+          {
+            echo
+            echo "## #$ISSUE · $(date -u +%F)"
+            echo
+            echo "- **Links:** ${links:-none}"
+            echo "- **Note:**"
+            echo
+            sed 's/^/  > /' "$RUNNER_TEMP/note/text.md"
+          } >> "$file"
+          git config user.name "greenlight-notes"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$file"
+          git commit -m "field notes: #$ISSUE"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then pushed=1; break; fi
+            sleep $((attempt * 5))
+          done
+          [ "${pushed:-}" = 1 ] || { echo "::error::Could not push the field notes"; exit 1; }
+
+      - name: Close the note
+        run: |
+          url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/$GITHUB_REF_NAME/analysis/field-notes.md"
+          gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+            --body "Added to the [field notes]($url). The Analyst reads them with next Monday's signals."
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --remove-label note
+          gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" --reason completed
+
+  scribe:
+    needs: read
+    if: needs.read.outputs.kind == 'idea'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: note
+          path: .greenlight-run
+
+      - name: Expand the note into an idea card
+        id: claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          prompt: |
+            You are the Greenlight Scribe. Your role instructions are in .claude/agents/scribe.md.
+            Read them first and follow them exactly.
+
+            Inputs:
+            - .greenlight-run/note.md: the owner's note
+            - compass.md
+            - templates/idea.md: the card format
+
+            Write no files. Return the structured result.
+          claude_args: >-
+            --max-turns ${{ vars.SCRIBE_MAX_TURNS || '8' }}
+            ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
+            --allowedTools "Read"
+            --json-schema '{"type":"object","additionalProperties":false,"required":["name","size","body"],"properties":{"name":{"type":"string","minLength":2,"maxLength":60},"size":{"type":"string","enum":["S","M","L"]},"body":{"type":"string","minLength":50}}}'
+
+  publish:
+    needs: [read, scribe]
+    if: always() && needs.read.outputs.kind == 'idea'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SCRIBE_RESULT: ${{ needs.scribe.result }}
+      SCRIBE_JSON: ${{ needs.scribe.outputs.result }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: note
+          path: ${{ runner.temp }}/note
+
+      - name: Rewrite the issue as an idea card
+        run: |
+          set -euo pipefail
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          if [ "$SCRIBE_RESULT" != success ] || [ -z "$SCRIBE_JSON" ]; then
+            gh issue comment "$ISSUE" --repo "$GITHUB_REPOSITORY" \
+              --body "The Scribe could not expand this note ([run]($run_url)). Remove and re-add \`note\` to try again."
+            exit 1
+          fi
+          name=$(jq -r '.name' <<<"$SCRIBE_JSON" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-' | cut -c1-40)
+          name=${name:-note-$ISSUE}
+          size=$(jq -r '.size' <<<"$SCRIBE_JSON")
+          # The note's links may lead to text from the internet, so @mentions are defused to avoid pinging strangers.
+          jq -r '.body | gsub("@(?<u>[A-Za-z0-9_-])"; "@​\(.u)")' <<<"$SCRIBE_JSON" > "$RUNNER_TEMP/body.md"
+          {
+            echo
+            echo "### Original note"
+            echo
+            sed 's/^/> /' "$RUNNER_TEMP/note/text.md"
+            echo
+            echo "---"
+            echo "_Expanded by the Scribe from your note. Size **${size}**, not scored by the Critic._"
+            echo "_Add \`approved\` to send it to the Architect, or \`archived\` to drop it._"
+          } >> "$RUNNER_TEMP/body.md"
+          gh issue edit "$ISSUE" --repo "$GITHUB_REPOSITORY" --title "[idea] $name" --body-file "$RUNNER_TEMP/body.md" \
+            --add-label idea --remove-label note
+          echo "Rewrote #$ISSUE as [idea] $name (size $size)"

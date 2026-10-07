@@ -48,7 +48,7 @@
     "limit": 30
   },
   "stackexchange": {
-    "_comment": "API site names (softwarerecs = softwarerecs.stackexchange.com). Software Recommendations and Web Applications are mostly people asking whether a tool exists; the support sites (Super User, Ask Ubuntu, Apple, Android) and the niche sites after them (trades, hobbies, academia, work, home) only reach the Analyst with a pain phrase (export.dropWithoutPain). Money, law and health sites are left out: the compass rules out financial, legal and medical advice.",
+    "_comment": "API site names (softwarerecs = softwarerecs.stackexchange.com). Software Recommendations and Web Applications are mostly people asking whether a tool exists; the support sites (Super User, Ask Ubuntu, Apple, Android) and the niche sites after them (trades, hobbies, academia, work, home, design, freelancing, travel, music) only reach the Analyst with a pain phrase (export.dropWithoutPain). Money, law and health sites are left out: the compass rules out financial, legal and medical advice.",
     "enabled": true,
     "sites": [
       "softwarerecs",
@@ -68,7 +68,15 @@
       "crafts",
       "3dprinting",
       "parenting",
-      "cooking"
+      "cooking",
+      "ux",
+      "pm",
+      "freelancing",
+      "webmasters",
+      "travel",
+      "music",
+      "bicycles",
+      "lifehacks"
     ],
     "minScore": 0,
     "pageSize": 100
@@ -83,9 +91,54 @@
       { "name": "anki", "url": "https://forums.ankiweb.net" },
       { "name": "pixls", "url": "https://discuss.pixls.us" },
       { "name": "glowforge", "url": "https://community.glowforge.com" },
-      { "name": "shopify", "url": "https://community.shopify.com" }
+      { "name": "shopify", "url": "https://community.shopify.com" },
+      { "name": "logseq", "url": "https://discuss.logseq.com" },
+      { "name": "joplin", "url": "https://discourse.joplinapp.org" },
+      { "name": "nextcloud", "url": "https://help.nextcloud.com" },
+      { "name": "bitwarden", "url": "https://community.bitwarden.com" },
+      { "name": "n8n", "url": "https://community.n8n.io" },
+      { "name": "plex", "url": "https://forums.plex.tv" },
+      { "name": "kicad", "url": "https://forum.kicad.info" }
     ],
     "maxTopics": 30
+  },
+  "issues": {
+    "_comment": "GitHub issue search across public repos: feature requests and how-do-I questions that already collect reactions (other people saying me too). Each query gets is:issue and created:>=<createdWithinDays ago> added, and results sort by reactions. Uses the workflow's own GITHUB_TOKEN.",
+    "enabled": true,
+    "queries": [
+      "label:\"feature request\" reactions:>=10",
+      "label:enhancement reactions:>=10",
+      "\"is there a way\" in:title reactions:>=5"
+    ],
+    "createdWithinDays": 7,
+    "perPage": 50
+  },
+  "lemmy": {
+    "_comment": "Lemmy communities as name@instance, read through the open API of their home instance (/api/v3/post/list). No key. The nearest thing to Reddit's question and help subs. Posts only reach the Analyst with a pain phrase (export.dropWithoutPain).",
+    "enabled": true,
+    "communities": [
+      "asklemmy@lemmy.world",
+      "nostupidquestions@lemmy.world",
+      "selfhosted@lemmy.world",
+      "privacy@lemmy.ml",
+      "linux@lemmy.ml"
+    ],
+    "limit": 50
+  },
+  "bluesky": {
+    "_comment": "Bluesky post search for someone-should-build-this phrases. Search needs a logged-in session: set BLUESKY_IDENTIFIER (handle) and BLUESKY_APP_PASSWORD (Settings > Privacy and security > App passwords) as repository secrets. Skipped without them. service is the PDS of that account.",
+    "enabled": true,
+    "service": "https://bsky.social",
+    "queries": [
+      "\"is there an app\"",
+      "\"is there a tool\"",
+      "\"someone should build\"",
+      "\"someone should make\"",
+      "\"why is there no app\"",
+      "\"i wish there was an app\""
+    ],
+    "limit": 50,
+    "lang": "en"
   },
   "rss": {
     "_comment": "Any RSS 2.0 / RSS 1.0 / Atom feed.",
@@ -156,9 +209,9 @@
     "maxSharePerSource": 0.4,
     "maxTextLength": 600,
     "_questionChannels": "Where people ask for tools or describe problems: ranked up by questionBoost (about two pain phrases' worth). \"source\" or \"source:channel\".",
-    "questionChannels": ["hn:ask_hn", "hn:ask_hn_comment", "stackexchange", "reddit:SomebodyMakeThis", "reddit:AppIdeas"],
+    "questionChannels": ["hn:ask_hn", "hn:ask_hn_comment", "stackexchange", "issues", "reddit:SomebodyMakeThis", "reddit:AppIdeas"],
     "questionBoost": 0.25,
-    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement; Ask HN comments without one are mostly tool recommendations; the support and niche Stack Exchange sites and the forums are mostly one-off how-to questions.",
+    "_dropWithoutPain": "Left out of the export unless they contain a pain phrase. Plain HN news is most of the volume and almost never a problem statement; Ask HN comments without one are mostly tool recommendations; the support and niche Stack Exchange sites, the forums and the Lemmy communities are mostly one-off how-to questions.",
     "dropWithoutPain": [
       "hn:story",
       "hn:ask_hn_comment",
@@ -178,7 +231,16 @@
       "stackexchange:3dprinting",
       "stackexchange:parenting",
       "stackexchange:cooking",
-      "discourse"
+      "stackexchange:ux",
+      "stackexchange:pm",
+      "stackexchange:freelancing",
+      "stackexchange:webmasters",
+      "stackexchange:travel",
+      "stackexchange:music",
+      "stackexchange:bicycles",
+      "stackexchange:lifehacks",
+      "discourse",
+      "lemmy"
     ],
     "_contextSources": "Launches and new projects: evidence of competition, not of pain, so they don't take the Analyst's slots. export --context-out writes them to a competition file that the Analyst and Critic search.",
     "contextSources": ["producthunt", "github"],
