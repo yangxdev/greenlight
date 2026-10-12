@@ -1,0 +1,24 @@
+{
+  "week": "2026-W41",
+  "summary": "Week 2026-W41: all three live products (#5 greenlight-status, #3 agent-spend-cap, #1 opt-out-log) had 100% probe uptime (20/20) and healthy checks at report time. All are under 2 weeks old (live since 2026-10-02/03), so all are keep and it is too early to judge. opt-out-log has 0 visits for the second week running, likely because the link hasn't been posted. #3 and #5 still have no Web Analytics site, so there is no traffic data. The pipeline was idle: 0 ideas filed, 3 live, 0 stuck. No token is near expiry (352 and 356 days left).",
+  "products": [
+    {
+      "issue": 5,
+      "verdict": "keep",
+      "reason": "Live since 2026-10-03, under 2 weeks old, 100% uptime (20/20 probes), home 200 and health OK at 117 ms. Too early to judge; no traffic data because there is no Web Analytics site.",
+      "suggestion": "Add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN on the product repo (or map it in observer/config.json) so the 2-week window can be measured."
+    },
+    {
+      "issue": 3,
+      "verdict": "keep",
+      "reason": "Live since 2026-10-02, under 2 weeks old, 100% uptime (20/20 probes), home 200 and health OK at 129 ms. Too early to judge; no traffic data because there is no Web Analytics site.",
+      "suggestion": "Add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN before posting the link to Hacker News and the Claude Code and Codex GitHub discussions, so visits are counted."
+    },
+    {
+      "issue": 1,
+      "verdict": "keep",
+      "reason": "Live since 2026-10-02, under 2 weeks old, 100% uptime (20/20 probes), healthy at 110 ms. Visits are 0 this week and last (0 page views), most likely because the link hasn't been posted; too early to judge.",
+      "suggestion": "Post the link in at least one community from Reachable users (two for the archive threshold to apply) before 2026-10-16, when the archive rule starts counting."
+    }
+  ]
+}
