@@ -318,4 +318,18 @@ jobs:
       - name: Start Ideas
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ideas.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f chain=true
+        # A 5xx from the dispatch API can arrive after GitHub already created the run (2026-10-12), so look for it
+        # before trying again. A duplicate would be harmless anyway: a chain=true run stops at its gate.
+        run: |
+          start=$(date -u -d '-1 minute' +%FT%TZ)
+          for attempt in 1 2 3; do
+            gh workflow run ideas.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" -f chain=true && exit 0
+            sleep $((attempt * 15))
+            if [ -n "$(gh run list --repo "$GITHUB_REPOSITORY" --workflow ideas.yml --event workflow_dispatch \
+              --created ">=$start" --json databaseId --jq '.[0].databaseId // empty')" ]; then
+              echo "ideas.yml started despite the error"
+              exit 0
+            fi
+          done
+          echo "::error::Could not start ideas.yml"
+          exit 1
