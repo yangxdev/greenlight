@@ -1,0 +1,24 @@
+{
+  "week": "2026-W42",
+  "summary": "W42: all three live products have 100% probe uptime (25/25) and healthy checks. Traffic is 0 visits for opt-out-log (third week at zero) and no data for greenlight-status and agent-spend-cap, which still have no Web Analytics site. All three passed 2 weeks live this week, so the archive rule can't trigger before W43. The pipeline is idle: 0 ideas filed, 0 stuck, 3 live. Both tokens have over 340 days left. The main blockers are missing analytics and unposted links, not product quality.",
+  "products": [
+    {
+      "issue": 5,
+      "verdict": "keep",
+      "reason": "Up with 100% probe uptime (25/25) and home 200, health OK, latency 176 ms. Its success metric is a GitHub label measure not in metrics.json, and board shows 0 approved and 0 blueprint-ok, so there is nothing to judge it on yet.",
+      "suggestion": "Use it for the next approved/blueprint-ok labels and idea filing so the 80% metric can be checked from the issue timeline."
+    },
+    {
+      "issue": 3,
+      "verdict": "improve",
+      "reason": "Up at 100% (25/25), but there is no Web Analytics site, so traffic is no data and its 200-visit target can't be checked. The 2-week window has closed.",
+      "suggestion": "Create a Cloudflare Web Analytics site for agent-spend-cap and set CF_BEACON_TOKEN on its repo, then post the link on Hacker News and the Claude Code and Codex discussions."
+    },
+    {
+      "issue": 1,
+      "verdict": "improve",
+      "reason": "Up at 100% (25/25), but 0 visits and 0 page views this week and last, against a 300-visit target. Most likely the link has not been posted. It meets the archive rule only if W43 is also under 10 visits.",
+      "suggestion": "Post the opt-out-log link in at least two communities from Reachable users this week, so W43 shows whether the problem has demand."
+    }
+  ]
+}
