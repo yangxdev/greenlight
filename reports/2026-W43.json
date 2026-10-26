@@ -1,0 +1,24 @@
+{
+  "week": "2026-W43",
+  "summary": "W43: all three products are up (100% uptime from 28/28 probes each, healthy checks at report time). The pipeline is idle: 0 ideas filed, 3 live, 0 stuck. Web Analytics is still missing for #5 and #3, so there is no traffic data for them. opt-out-log (#1) has 0 visits for the second week after its 2-week mark, which meets the archive rule. This is most likely because the link was never posted, so the owner should decide. No tokens are near expiry (338 and 342 days left).",
+  "products": [
+    {
+      "issue": 5,
+      "verdict": "keep",
+      "reason": "Up with 100% uptime (28/28 probes) and 128 ms latency. Its success metric is a GitHub label-timeline measure that is not in metrics.json, and board counts show nothing for it to measure (0 approved, 0 blueprint-ok, 0 ideas filed). No traffic data: no Web Analytics site.",
+      "suggestion": "Optionally add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN so traffic can be reported."
+    },
+    {
+      "issue": 3,
+      "verdict": "improve",
+      "reason": "Up with 100% uptime (28/28), but the 200-visit success metric cannot be checked because no Web Analytics site exists. This gap has been open since W40 and the 2-week window has closed with no data.",
+      "suggestion": "Create a Cloudflare Web Analytics site for agent-spend-cap and set the product repo's CF_BEACON_TOKEN variable, then post the link on Hacker News and the Claude Code and Codex GitHub discussions."
+    },
+    {
+      "issue": 1,
+      "verdict": "archive",
+      "reason": "0 visits and 0 page views in W43 and in W42, and it is past 2 weeks live (since 2026-10-02), so it meets the under-10-visits-in-2-weeks rule. Uptime is 100%, so the product itself is fine. The likely cause is that the link was never posted.",
+      "suggestion": "Owner decides: archive it, or post the link in two Reachable-users communities first and re-judge next week."
+    }
+  ]
+}
