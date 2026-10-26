@@ -41,3 +41,26 @@ signal being in the current export.
     Claude merge requests and I barely understand what I approve."
   - https://news.ycombinator.com/item?id=49921591 (hn ask_hn, 2026-10-01, 18 / 15): "I've turned into a full time
     reviewer instead." (adjacent)
+
+## patch-check
+
+- **Best score:** 11/20 on 2026-10-26 (pain 2, competition 3, build 3, reach 3), size M
+- **Last new evidence:** 2026-10-26
+- **Problem:** Self-hosters and people who inherit servers can't tell from their package or container output whether
+  a named CVE is fixed on their system, because versions, backports and distro suffixes don't match the advisory.
+- **Needs:** more independent people asking "am I affected / is this fixed" for a specific package, outside the
+  one PHP/Brotli news wave and ideally unprompted by a headline CVE. A check of OSV.dev's web UI, Debian and Ubuntu
+  trackers and Trivy for a paste-and-answer flow, and whether OSV covers Ubuntu/Debian versions accurately. Whether
+  r/selfhosted and the forums allow link posts.
+- **Verified evidence:**
+  - https://askubuntu.com/questions/1570502/ubuntu-20-04-php-upgrading-assistance (stackexchange askubuntu,
+    2026-10-21, score 1 / 0 answers): "Inherited a bunch of Ubuntu 20.04 legacy servers… Anyone got a good
+    step-by-step on how to patch in this case?"
+  - https://community.bitwarden.com/t/vulnerable-nginx-version-in-bitwarden-self-hosted/103157 (discourse
+    bitwarden, 2026-10-23, 0 / 3): "I checked the NGINX version running in my Bitwarden container and found the
+    following: nginx version: nginx/1.31.6"
+  - https://help.nextcloud.com/t/is-nextcloud-33-0-10-docker-affected-by-cve-2026-111497-brotli/251517 (discourse
+    nextcloud, 2026-10-25, 0 / 2): "I would like to confirm whether the official Nextcloud Docker image is affected
+    by CVE-2026-111497 related to Google Brotli."
+  - https://github.com/mailcow/mailcow-dockerized/issues/7533 (issues, 2026-10-21, 53 / 70): "a timely patch for
+    this vulnerability is required to safely operate it further." (adjacent)
