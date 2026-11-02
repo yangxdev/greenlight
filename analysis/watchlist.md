@@ -64,3 +64,19 @@ signal being in the current export.
     by CVE-2026-111497 related to Google Brotli."
   - https://github.com/mailcow/mailcow-dockerized/issues/7533 (issues, 2026-10-21, 53 / 70): "a timely patch for
     this vulnerability is required to safely operate it further." (adjacent)
+
+## cold-catalog
+
+- **Best score:** 11/20 on 2026-11-02 (pain 2, competition 2, build 4, reach 3), size M
+- **Last new evidence:** 2026-11-02
+- **Problem:** People who keep media and backups on offline or external drives can't see what a drive holds without
+  plugging it in. A browser tool could snapshot each drive's file list and search across all of them.
+- **Needs:** more people asking for this in their own words in a second place (r/DataHoarder, r/selfhosted), ideally
+  saying existing catalogers failed them. A check of free disk catalogers (Cathy, gWhere, DiskCatalogMaker,
+  WinCatalog) for price, platform and upkeep. Whether the communities allow link posts.
+- **Verified evidence:**
+  - https://feddit.org/post/37319624 (lemmy selfhosted@lemmy.world, 2026-10-28, 36 points / 18 comments): "are there
+    any tools out there that allow me to browse which files are in cold storage, without the actual drives being
+    attached / mounted?"
+  - https://forums.plex.tv/t/need-help-finding-my-list-of-movies/945300 (discourse plex, 2026-10-29, 0 / 2): "The hard
+    drive that contained the movies crashed, but I have the metadata stored on a different drive." (adjacent)
