@@ -42,6 +42,22 @@ signal being in the current export.
   - https://news.ycombinator.com/item?id=49921591 (hn ask_hn, 2026-10-01, 18 / 15): "I've turned into a full time
     reviewer instead." (adjacent)
 
+## fstab-reader
+
+- **Best score:** 12/20 on 2026-11-09 (pain 2, competition 3, build 4, reach 3), size S
+- **Last new evidence:** 2026-11-09
+- **Problem:** Newer Ubuntu users and people who inherit machines can't read their own `/etc/fstab` or partition
+  layout, so they don't know whether it is right until a disk fills up or the system won't boot.
+- **Needs:** more people asking what their fstab or mount layout means, in a second place (r/linuxquestions,
+  r/linux4noobs, Unix & Linux SE), ideally with answers or upvotes. A check of existing fstab explainers, validators
+  and generators, and whether the communities allow link posts.
+- **Verified evidence:**
+  - https://askubuntu.com/questions/1570823/trying-to-understand-the-coding-of-these-three-fstabs (stackexchange
+    askubuntu, 2026-11-09, 0 / 0 answers): "I have three machines running Ubuntu on my desk (while I tinker with
+    them)."
+  - https://askubuntu.com/questions/1570809/does-my-ubuntu-system-bog-down-because-i-have-inadvertently-parked-my-home-unde
+    (stackexchange askubuntu, 2026-11-07, 0 / 0): "I have never really understood partitioning and mount points."
+
 ## patch-check
 
 - **Best score:** 11/20 on 2026-10-26 (pain 2, competition 3, build 3, reach 3), size M
@@ -80,3 +96,16 @@ signal being in the current export.
     attached / mounted?"
   - https://forums.plex.tv/t/need-help-finding-my-list-of-movies/945300 (discourse plex, 2026-10-29, 0 / 2): "The hard
     drive that contained the movies crashed, but I have the metadata stored on a different drive." (adjacent)
+
+## frame-step
+
+- **Best score:** 11/20 on 2026-11-09 (pain 2, competition 2, build 4, reach 3), size S
+- **Last new evidence:** 2026-11-09
+- **Problem:** Animators gathering motion reference lack a light tool to step through a clip one frame at a time;
+  ordinary media players handle that part badly.
+- **Needs:** a second and third person asking for frame-by-frame reference scrubbing in their own words (r/animation,
+  animator forums), ideally saying VLC or mpv failed them. A check of free browser frame steppers and of what the
+  replies to the Bluesky post recommended. Whether the communities allow link posts.
+- **Verified evidence:**
+  - https://bsky.app/profile/did:plc:iqkryxces53twi3vnge6eqw3/post/3mzirk6w3jk2g (bluesky search, 2026-11-04, 19
+    likes / 5 replies): "I find most media players aren't great for that second part"
