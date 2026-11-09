@@ -1,0 +1,24 @@
+{
+  "week": "2026-W45",
+  "summary": "All three live products were up for the week (100% probe uptime, 16/16 each; home 200, health OK, latency 110-112 ms). The only measurable traffic is opt-out-log (#1), which had 0 visits this week and last, so archive is recommended. That is probably because the link was never posted. Traffic for agent-spend-cap (#3) and greenlight-status (#5) is still missing because they have no Web Analytics site (open since W40). The pipeline was idle: 0 ideas filed and 0 stuck. Tokens are fine, with 324 and 328 days left. The probe count fell from 21 to 16, which is worth checking.",
+  "products": [
+    {
+      "issue": 5,
+      "verdict": "keep",
+      "reason": "Up with 100% probe uptime (16/16) and a healthy check (latency 110 ms). Its success metric is a GitHub label-timeline measure that isn't in metrics.json, so there is no data. There were no approved or blueprint-ok issues and 0 ideas filed to measure.",
+      "suggestion": "Optionally add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN on the repo, or map it in observer/config.json, so traffic is visible."
+    },
+    {
+      "issue": 3,
+      "verdict": "improve",
+      "reason": "Up with 100% uptime (16/16). Its success metric (200 unique visits, 10 distinct visitors on shared-estimate URLs) can't be checked because no Web Analytics site exists. Its 2-week window has closed with no data.",
+      "suggestion": "Create a Cloudflare Web Analytics site for agent-spend-cap and set the repo's CF_BEACON_TOKEN variable (or map it in observer/config.json), then post the link as the blueprint plans."
+    },
+    {
+      "issue": 1,
+      "verdict": "archive",
+      "reason": "0 visits and 0 page views this week and last, both past the 2-week mark (live since 2026-10-02). That meets the archive rule, and also its own metric (archive below 100 visits). Uptime is 100% (16/16). The zero most likely reflects a link that was never posted.",
+      "suggestion": "Archive it, or first post the link in two communities from 'Reachable users' and re-judge next week. Archiving is the owner's call."
+    }
+  ]
+}
