@@ -76,7 +76,21 @@
       "travel",
       "music",
       "bicycles",
-      "lifehacks"
+      "lifehacks",
+      "unix",
+      "raspberrypi",
+      "video",
+      "sound",
+      "gamedev",
+      "rpg",
+      "chess",
+      "outdoors",
+      "pets",
+      "languagelearning",
+      "genealogy",
+      "writing",
+      "mechanics",
+      "homebrew"
     ],
     "minScore": 0,
     "pageSize": 100
@@ -98,7 +112,20 @@
       { "name": "bitwarden", "url": "https://community.bitwarden.com" },
       { "name": "n8n", "url": "https://community.n8n.io" },
       { "name": "plex", "url": "https://forums.plex.tv" },
-      { "name": "kicad", "url": "https://forum.kicad.info" }
+      { "name": "kicad", "url": "https://forum.kicad.info" },
+      { "name": "make", "url": "https://community.make.com" },
+      { "name": "bubble", "url": "https://forum.bubble.io" },
+      { "name": "glide", "url": "https://community.glideapps.com" },
+      { "name": "ghost", "url": "https://forum.ghost.org" },
+      { "name": "framework", "url": "https://community.frame.work" },
+      { "name": "fairphone", "url": "https://forum.fairphone.com" },
+      { "name": "rclone", "url": "https://forum.rclone.org" },
+      { "name": "restic", "url": "https://forum.restic.net" },
+      { "name": "duplicati", "url": "https://forum.duplicati.com" },
+      { "name": "syncthing", "url": "https://forum.syncthing.net" },
+      { "name": "freecodecamp", "url": "https://forum.freecodecamp.org" },
+      { "name": "cursor", "url": "https://forum.cursor.com" },
+      { "name": "level1techs", "url": "https://forum.level1techs.com" }
     ],
     "maxTopics": 30
   },
@@ -108,7 +135,8 @@
     "queries": [
       "label:\"feature request\" reactions:>=10",
       "label:enhancement reactions:>=10",
-      "\"is there a way\" in:title reactions:>=5"
+      "\"is there a way\" in:title reactions:>=5",
+      "label:\"feature-request\" reactions:>=10"
     ],
     "createdWithinDays": 7,
     "perPage": 50
@@ -121,7 +149,15 @@
       "nostupidquestions@lemmy.world",
       "selfhosted@lemmy.world",
       "privacy@lemmy.ml",
-      "linux@lemmy.ml"
+      "linux@lemmy.ml",
+      "selfhost@lemmy.ml",
+      "datahoarder@lemmy.ml",
+      "homelab@lemmy.ml",
+      "linux4noobs@programming.dev",
+      "opensource@lemmy.ml",
+      "photography@lemmy.world",
+      "3dprinting@lemmy.world",
+      "diy@lemmy.world"
     ],
     "limit": 50
   },
@@ -144,7 +180,9 @@
     "_comment": "Any RSS 2.0 / RSS 1.0 / Atom feed.",
     "enabled": true,
     "feeds": [
-      { "name": "Lobsters Ask", "url": "https://lobste.rs/t/ask.rss" }
+      { "name": "Lobsters Ask", "url": "https://lobste.rs/t/ask.rss" },
+      { "name": "Tildes tech", "url": "https://tildes.net/~tech/topics.rss" },
+      { "name": "Tildes comp", "url": "https://tildes.net/~comp/topics.rss" }
     ]
   },
   "painPhrases": [
@@ -205,7 +243,7 @@
   "export": {
     "_comment": "Caps what the Analyst reads each week; this is what costs Claude usage.",
     "days": 7,
-    "limit": 150,
+    "limit": 200,
     "maxSharePerSource": 0.4,
     "maxTextLength": 600,
     "_questionChannels": "Where people ask for tools or describe problems: ranked up by questionBoost (about two pain phrases' worth). \"source\" or \"source:channel\".",
@@ -239,6 +277,22 @@
       "stackexchange:music",
       "stackexchange:bicycles",
       "stackexchange:lifehacks",
+      "stackexchange:unix",
+      "stackexchange:raspberrypi",
+      "stackexchange:video",
+      "stackexchange:sound",
+      "stackexchange:gamedev",
+      "stackexchange:rpg",
+      "stackexchange:chess",
+      "stackexchange:outdoors",
+      "stackexchange:pets",
+      "stackexchange:languagelearning",
+      "stackexchange:genealogy",
+      "stackexchange:writing",
+      "stackexchange:mechanics",
+      "stackexchange:homebrew",
+      "rss:Tildes tech",
+      "rss:Tildes comp",
       "discourse",
       "lemmy"
     ],

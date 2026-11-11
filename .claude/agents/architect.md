@@ -45,7 +45,8 @@ the same `## ` sections in the same order, tasks as `### Task N: <title>`, and *
    and nothing presents the product to itself. Pick `page` only when the product's job is to be read top to bottom
    (a guide, an explainer, a public log); then write the real headline and the numbered sections. The look itself is
    fixed by the template; don't describe colours, fonts or components, and don't ask for logos, icons or
-   illustrations.
+   illustrations. Nobody posts the link, so search is how users arrive: write the Description, the view titles
+   (or the headline) with the words people search with, which the idea's Target users section names.
 10. If the idea breaks the compass (no-go list, budget, stack), still write a blueprint for the closest compliant
    version, and state the conflict in the first line under the title as `> ⚠️ Compass conflict: …`.
 

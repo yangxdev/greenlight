@@ -20,6 +20,7 @@ import {
   json,
   makeCtx,
   REDDIT_ENV,
+  shippedConfig,
   TEST_USER_AGENT,
   xml,
 } from './helpers.ts'
@@ -416,7 +417,7 @@ describe('issues', () => {
 
     const queries = f.calls.map((c) => new URL(c.url).searchParams.get('q'))
     expect(queries[0]).toBe('is:issue label:"feature request" reactions:>=10 created:>=2026-09-22')
-    expect(queries).toHaveLength(3)
+    expect(queries).toHaveLength(shippedConfig().issues.queries.length)
     expect(new URL(f.calls[0]?.url ?? '').searchParams.get('sort')).toBe('reactions')
     expect(header(f.calls[0], 'authorization')).toBe('Bearer ghs_test')
     // Every query returns the same fixture here; the CLI collapses duplicates by id.

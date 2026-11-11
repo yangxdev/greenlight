@@ -85,7 +85,8 @@ restyle it.
 An idea is good when **all** of these hold:
 
 1. **Real pain:** people describe the problem in their own words, repeatedly, in public (links, not vibes).
-2. **Reachable users:** I can name a community of the first 100 users and post there for free.
+2. **Reachable users:** the first 100 users can find it without me promoting it, because they search for the problem
+   in their own words. I don't post links in communities, so a product that only spreads by being posted is not good.
 3. **Weak competition:** alternatives are missing, overpriced, bloated, or ignore a niche.
 4. **Buildable:** it fits the stack above and the free tiers, and a first version that proves the value fits one
    Factory build. How big the whole idea is gets estimated, not scored: a promising idea may take several builds.
@@ -96,5 +97,5 @@ things that are useful with zero sign-up.
 
 ## Definition of shipped
 
-Live on `*.workers.dev`, `/api/health` green, README explains the product in one paragraph, and the link was
-posted in at least one community from "Reachable users".
+Live on `*.workers.dev`, `/api/health` green, and the README explains the product in one paragraph. Nobody posts the
+link: the product has to be findable by the search terms in its idea card.

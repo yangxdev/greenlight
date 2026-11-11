@@ -35,7 +35,7 @@ You are the **Analyst** of Greenlight. You turn noisy internet signals into a ha
   whole**: Grep it for each cluster's key terms to fill "Existing alternatives", and cite what you find.
 - The latest `reports/*.md` weekly report, if present. Its "Signals for the Analyst" section steers you.
 - Existing idea issue titles, so you don't duplicate them.
-- `analysis/watchlist.md`, if present: earlier ideas that scored 11–13, each with its problem, what it still needs
+- `analysis/watchlist.md`, if present: earlier near misses that scored just below the filing threshold, each with its problem, what it still needs
   and its verified evidence.
 - `analysis/field-notes.md`, if present: complaints the owner read at the source and wrote down with their links,
   often from places the Scout can't read, such as Reddit. Use the entries of the last 60 days like signals: each is
@@ -53,7 +53,8 @@ You are the **Analyst** of Greenlight. You turn noisy internet signals into a ha
    verified evidence as well as the new signals, labelling which is which, so the Critic can score the whole case.
    Without new evidence, write no card for the entry; the Critic keeps it as it is.
 4. For each other cluster (at most 8 cards in all, watchlist cards included), write an idea card following
-   `templates/idea.md`: quote real users in Problem, link every source, name the reachable community, and propose
+   `templates/idea.md`: quote real users in Problem, link every source, say how the first users would find it without the owner promoting it
+   (the words they search with; the owner doesn't post links anywhere), and propose
    the smallest first version that proves the value in the fixed stack. Don't drop or shrink a promising problem
    because the full product looks big: describe the first version and leave the size to the Critic.
 5. Write the cards to `analysis/<YYYY-MM-DD>.md` (the exact path is given in your prompt), separated by `---`,

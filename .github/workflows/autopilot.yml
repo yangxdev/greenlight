@@ -1,0 +1,76 @@
+# Autopilot: passes the two human gates by itself after a veto window, and sends phone notifications through ntfy.
+# No AI. The logic and its rules are in .github/scripts/autopilot.py; the tests next to it run in Scripts CI.
+#
+#   new idea         -> notification + comment: "approves this on <date> unless you add hold"
+#   48 h, no veto    -> `approved` (GREENLIGHT_TOKEN, so the Architect sees the owner) when nothing else is in flight
+#   blueprint-ready  -> notification with the Reviewer's concerns
+#   24 h (ready) or 72 h (needs input), no veto -> `blueprint-ok` when nothing is building; an unreviewed draft waits
+#   building, live, stuck, shipped -> notification; Ideas and Observer runs -> the weekly summary
+#
+# Veto: add `hold` to the issue, close it, or add `archived`. Stop everything: set the AUTOPILOT variable to `off`
+# (or `notify` to keep the notifications). Without the NTFY_TOPIC secret it does nothing at all.
+#
+# Settings (repository variables): AUTOPILOT (on), AUTOPILOT_IDEA_HOURS (48), AUTOPILOT_BLUEPRINT_HOURS (24),
+# AUTOPILOT_NEEDS_OWNER_HOURS (72), AUTOPILOT_MAX_APPROVALS (2 per 30 days), NTFY_SERVER (https://ntfy.sh).
+# Secrets: NTFY_TOPIC, optional NTFY_TOKEN for a protected topic, GREENLIGHT_TOKEN (already set for the Architect).
+name: Autopilot
+
+on:
+  schedule:
+    - cron: "23 * * * *" # hourly, for the veto windows; events below make notifications prompt
+  issues:
+    types: [labeled]
+  workflow_run:
+    workflows: [Ideas, Observer, Architect, Factory dispatch]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Print what it would notify and label, change nothing
+        type: boolean
+        default: false
+
+# One at a time; a newer pending run replaces an older one, which is fine because every run reconciles everything.
+concurrency:
+  group: autopilot
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sweep:
+    if: vars.AUTOPILOT != 'off'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: write
+      actions: read
+    steps:
+      # Runs only greenlight's own script from the default branch, like template-sync; no AI in this job.
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+
+      - name: Notify and advance
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GREENLIGHT_TOKEN: ${{ secrets.GREENLIGHT_TOKEN }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          NTFY_TOKEN: ${{ secrets.NTFY_TOKEN }}
+          NTFY_SERVER: ${{ vars.NTFY_SERVER }}
+          OWNER: ${{ github.repository_owner }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch || 'main' }}
+          AUTOPILOT: ${{ vars.AUTOPILOT || 'on' }}
+          AUTOPILOT_IDEA_HOURS: ${{ vars.AUTOPILOT_IDEA_HOURS }}
+          AUTOPILOT_BLUEPRINT_HOURS: ${{ vars.AUTOPILOT_BLUEPRINT_HOURS }}
+          AUTOPILOT_NEEDS_OWNER_HOURS: ${{ vars.AUTOPILOT_NEEDS_OWNER_HOURS }}
+          AUTOPILOT_MAX_APPROVALS: ${{ vars.AUTOPILOT_MAX_APPROVALS }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          WORKFLOW_RUN_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          WORKFLOW_RUN_URL: ${{ github.event.workflow_run.html_url }}
+          WORKFLOW_RUN_CREATED_AT: ${{ github.event.workflow_run.created_at }}
+        run: python3 .github/scripts/autopilot.py

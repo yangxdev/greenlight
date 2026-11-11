@@ -31,4 +31,5 @@ jobs:
           archived|cfd3d7|State: dropped or retired
           change|bfd4f2|Kind: a change to a live product (a sub-issue of its idea issue); it keeps this label
           shipped|0b6e2e|State: a change that is built, merged and deployed
+          hold|e4e669|Autopilot: never advance this issue (veto); remove it to let the Autopilot go on
           LABELS

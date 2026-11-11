@@ -80,7 +80,7 @@ Scout secrets (all optional; the Scout runs without them):
 | `MONGODB_URI` | Atlas connection string (see below) | signals go to a JSONL artifact on each run instead of MongoDB |
 | `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET` | a **script** app at reddit.com/prefs/apps, which needs Reddit's approval first. Greenlight's request was denied on 2026-10-01 ([details](../scout/README.md#reddit-access)) | Reddit is skipped; the other sources still run |
 | `PRODUCTHUNT_TOKEN` | producthunt.com/v2/oauth/applications → developer token | public feed only, with no vote or comment counts |
-| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs about 30 a day for its 26 sites, so a key is recommended |
+| `STACKEXCHANGE_KEY` | stackapps.com/apps/oauth/register → the app's **Key** (not a secret, but kept with the others) | 300 requests a day per IP, shared on GitHub's runners; the Scout needs about 40 a day for its 40 sites, so a key is recommended |
 | `BLUESKY_IDENTIFIER`, `BLUESKY_APP_PASSWORD` | your Bluesky handle, and an app password from Settings → Privacy and security → App passwords (never the account password) | Bluesky is skipped; Bluesky search needs a logged-in session |
 
 **MongoDB Atlas (free M0):** create an M0 cluster, add a database user limited to read/write on the `greenlight` database,
@@ -91,15 +91,23 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`public`|`private`, default `public`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
 `INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
-`CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (14), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), `CLAUDE_TOKEN_EXPIRES`
+`CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (12), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), `CLAUDE_TOKEN_EXPIRES`
 (`YYYY-MM-DD`, for the Observer's expiry warning), and `CLAUDE_MODEL` (passed as `--model`;
 empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can
 override them there per product.
 
+**Autopilot and phone notifications** (optional, see [HOW-IT-WORKS.md](HOW-IT-WORKS.md#autopilot)): install the
+ntfy app, subscribe to a topic name nobody can guess (it works like a password, e.g. `greenlight-` plus 20 random
+characters), and save that name as the secret `NTFY_TOPIC`. With a self-hosted or protected topic, also set
+`NTFY_SERVER` (variable) and `NTFY_TOKEN` (secret). Without `NTFY_TOPIC` the Autopilot does nothing. To get
+notifications but keep both gates yours, set the variable `AUTOPILOT` to `notify`; `off` stops it entirely.
+Its other variables: `AUTOPILOT_IDEA_HOURS` (48), `AUTOPILOT_BLUEPRINT_HOURS` (24), `AUTOPILOT_NEEDS_OWNER_HOURS` (72),
+`AUTOPILOT_MAX_APPROVALS` (2 per 30 days).
+
 ## 4. Create the labels
 
 Actions → **Setup labels** → *Run workflow*. It's safe to re-run, and needed again after an update adds labels (the
-`change` and `shipped` labels came with changes to live products).
+`change` and `shipped` labels came with changes to live products, and `hold` with the Autopilot).
 
 ## 5. Create the Project board
 

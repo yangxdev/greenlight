@@ -10,7 +10,7 @@
 
 ### Target users
 
-<The first 100 users and the community where they hang out.>
+<The first 100 users, and how they find it without anyone promoting it: what they type into a search engine.>
 
 ### MVP
 

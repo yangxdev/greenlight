@@ -1,6 +1,6 @@
 # Watchlist
 
-Ideas that scored 11–13/20: real enough to keep, too thin to file. The Analyst checks each week's signals against
+Ideas that scored just below the filing threshold: real enough to keep, too thin to file. The Analyst checks each week's signals against
 them, so evidence adds up across weeks instead of being forgotten. The Critic keeps this file (rules in
 `.claude/agents/critic.md`); delete an entry by hand to stop watching it.
 
