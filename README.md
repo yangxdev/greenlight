@@ -18,10 +18,12 @@ the whole pipeline in 16 minutes of machine time.
    cards on four criteria, estimates each one's size, and files at most three as GitHub issues. Most ideas die here;
    near misses go on a [watchlist](analysis/watchlist.md) until more evidence turns up.
 3. **You** add `approved` to an idea you want, or jot down your own with a quick note, which the **Scribe** turns into
-   a full card.
+   a full card. Or let the **Autopilot** do it: it sends each new idea to your phone (ntfy) and approves it 48 hours
+   later unless you add `hold`.
 4. **Architect** creates the product repo and writes a blueprint of at most 10 tasks. A **Reviewer** with a fresh
    context checks and repairs it.
-5. **You** add `blueprint-ok`. This is the one decision that spends a build.
+5. **You** add `blueprint-ok`. This is the one decision that spends a build. The Autopilot adds it a day after a clean
+   review (three days if the Reviewer has questions), at most two products a month, one at a time.
 6. **Factory** implements the tasks and opens a pull request. **Inspector** runs the checks and an AI review, then
    merges or sends it back for a fix, at most three rounds.
 7. **Publisher** (no AI) deploys to Cloudflare, smoke-tests it and puts the live link and screenshots in the README.
@@ -58,6 +60,8 @@ Time spent at the two human gates isn't counted, and neither is the Scout's dail
   plain scripts. Every agent has a turn limit and only one product builds at a time, so a Pro plan's usage is enough.
 - **No AI job holds a write token.** Agents work in jobs with read-only credentials and hand files to separate
   credentialed jobs that run no AI and no repository code.
+- **Gates you can step away from.** Both gates are yours, but the Autopilot can hold them for you: it notifies, waits,
+  and only then proceeds. `hold` vetoes one issue; `AUTOPILOT=notify` hands the gates back.
 - **Evidence over enthusiasm.** The Critic scores an idea 0 for pain when its quotes aren't in the collected signals,
   and an empty week is a valid outcome.
 - **One look, two layouts.** Every product is built from the same [template](template) and

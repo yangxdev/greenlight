@@ -9,18 +9,21 @@ the usage budget and the security model. To run your own copy, see [SETUP.md](SE
    which then starts **Ideas**. GitHub sometimes starts scheduled runs hours late, so the weekly steps follow each other
    rather than clock times. Each has a Monday-afternoon fallback schedule, and skips itself when its output (this week's
    report, today's analysis) already exists. Started by hand, they always run. **Ideas** (`ideas.yml`):
-   - `export` (no AI) takes the ranked Scout export (about 150 problem signals), a separate competition file of recent
+   - `export` (no AI) takes the ranked Scout export (about 200 problem signals), a separate competition file of recent
      Product Hunt launches and new GitHub projects (searched, not read whole), and the existing idea titles;
    - the **Analyst** (AI, about 20 turns) writes idea cards to `analysis/<date>.md`;
    - the **Critic** (AI, fresh context, about 15 turns) checks the cards' evidence against the signals and scores them
      on the compass rubric, and estimates each card's size (S, M or L) without scoring it. It writes
-     `analysis/<date>-critic.md` and returns a JSON verdict. Cards scoring 11–13 go on `analysis/watchlist.md` with
+     `analysis/<date>-critic.md` and returns a JSON verdict. Cards scoring just below the threshold (10–11) go on `analysis/watchlist.md` with
      their verified evidence; the next weeks' Analysts check new signals against it, so a problem that comes up once a
      month can still add up to a filed idea. Delete an entry to stop watching it;
    - `publish` (no AI) commits `analysis/` and files at most `CRITIC_MAX_IDEAS` (3) issues scoring at least
-     `CRITIC_MIN_SCORE` (14/20), skipping titles that already exist and defusing @mentions.
-   It never adds `approved`, and bot-filed issues trigger nothing.
+     `CRITIC_MIN_SCORE` (12/20; the Critic gets the same number in its prompt), skipping titles that already exist
+     and defusing @mentions.
+   It never adds `approved`, and bot-filed issues trigger nothing. The **Autopilot** (below) may add it later.
 1. **You** review the `idea` issues, or write your own with the *Idea* form, and add `approved` to the ones you want.
+   With the Autopilot on, you only veto: it adds `approved` itself 48 hours after notifying you (see
+   [Autopilot](#autopilot)).
    For a few lines on the go, use the *Quick note* form (`notes.yml`): a note of kind Idea is expanded by the
    **Scribe** (AI, about 8 turns) into an `idea` card, and a note of kind Evidence (someone's complaint you read, on
    Reddit or anywhere) is appended to `analysis/field-notes.md`, which the Analyst and Critic read every week. Only
@@ -40,7 +43,9 @@ the usage budget and the security model. To run your own copy, see [SETUP.md](SE
      review failed or broke it), commits it, comments the link, the Reviewer's changes and concerns, and a
      `<!-- greenlight:repo=owner/name -->` marker, and sets the label to `blueprint-ready`.
 3. **You** read the Reviewer's summary (and `blueprint.md` if you like; edit it freely) and add `blueprint-ok`.
-   This gate is deliberately yours: it is the one decision that spends a build.
+   This is the one decision that spends a build. With the Autopilot on, it adds `blueprint-ok` itself 24 hours after
+   a `ready` review, or 72 hours after a review that asks for your input, unless you add `hold`. It never builds a
+   draft whose review failed.
 4. **Factory dispatch** (`factory-dispatch.yml`, no AI) refuses if another issue is `building`, otherwise sends
    `repository_dispatch: greenlight-build` to the product repo and sets the label to `building`.
 5. **Factory** (`factory.yml` in the product repo, about 80 turns max). Claude implements the tasks in order, runs
@@ -73,6 +78,30 @@ the usage budget and the security model. To run your own copy, see [SETUP.md](SE
      product's issue only when its verdict changes, and never touches labels;
    - the next Analyst run reads the report's "Signals for the Analyst". With nothing live, the AI step is skipped and a
      board-only report is written instead.
+
+## Autopilot
+
+`autopilot.yml` (hourly and after every label change, no AI; logic in `.github/scripts/autopilot.py`) lets the pipeline
+run while you don't look at it, and tells your phone what it does through [ntfy](https://ntfy.sh).
+
+- **Notifications** for each new `idea` (score, problem, when it will be approved), `blueprint-ready` (the Reviewer's
+  verdict and concerns, when the build starts), `building`, `live` (with the link), `stuck`, a `shipped` change, and
+  the weekly Ideas and Observer summaries. Tapping one opens the issue.
+- **Advancing**, at most one issue per run: `approved` on the oldest idea once its 48-hour veto window has passed,
+  nothing else is in flight (`approved`, `blueprint-ready`, `blueprint-ok`, `building`) and fewer than
+  `AUTOPILOT_MAX_APPROVALS` (2) ideas were approved in the last 30 days; `blueprint-ok` once a blueprint's window has
+  passed and nothing is building. It adds both with `GREENLIGHT_TOKEN`, so the gates' `github.actor` check still sees
+  the owner. It comments the deadline on the issue when the window starts.
+- **Never advanced:** issues labelled `hold`, closed or `archived` ones, changes, ideas opened by anyone but you or the
+  workflow bot (the public *Idea* form labels its issues `idea`), and blueprints whose review failed.
+- **Off switches:** `hold` on one issue (remove it to let the Autopilot go on); the `AUTOPILOT` variable set to
+  `notify` (notifications only) or `off`. Without the `NTFY_TOPIC` secret it does nothing at all, so nothing is built
+  that you weren't told about. When a notification fails, the run advances nothing and the next run retries.
+- **Windows** are variables: `AUTOPILOT_IDEA_HOURS` (48), `AUTOPILOT_BLUEPRINT_HOURS` (24),
+  `AUTOPILOT_NEEDS_OWNER_HOURS` (72).
+
+Because nobody promotes the products, the compass and the Critic count "reachable users" as people who search for the
+problem in their own words, and the Architect writes the product's description and titles with those words.
 
 ## After a product is live
 
@@ -120,6 +149,7 @@ bucket, `npx wrangler secret put MONGODB_URI`, and Atlas network access.
 The Pro plan's usage limits are the real budget:
 
 - **One build at a time.** factory-dispatch checks the `building` label.
+- **At most two autopilot products a month** (`AUTOPILOT_MAX_APPROVALS`), and only one in flight at a time.
 - **Every agent has `--max-turns`:** `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), and for a change, which reads
   the product's code first, `ARCHITECT_CHANGE_MAX_TURNS` (40) and `REVIEWER_CHANGE_MAX_TURNS` (30); `FACTORY_MAX_TURNS` (80),
   `FIX_MAX_TURNS` (40), `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
@@ -153,14 +183,19 @@ through `$GITHUB_ENV`), so jobs are the security boundary here, not steps.
 | Publisher | `build` (dist/ out), `screenshots` (PNGs out; playwright-core installed outside the repo) | `gate`, `deploy` (`npm ci --ignore-scripts`, wrangler installed outside the repo), `report`, `readme` (git, gh, curl, inline Python) |
 
 - Claude gets the job's short-lived, read-only `GITHUB_TOKEN`. Pushes use the PAT with `core.hooksPath=/dev/null`.
-- Gate labels only trigger when you apply them (`github.actor == github.repository_owner`).
+- Gate labels only trigger when you apply them (`github.actor == github.repository_owner`), or when the Autopilot
+  applies them with your `GREENLIGHT_TOKEN` after the veto window. The Autopilot job runs no AI and only greenlight's
+  own script.
 - Remaining exposure: the Factory's `agent` job runs code Claude writes (`npm run …`), and that job holds
   `CLAUDE_CODE_OAUTH_TOKEN`. The worst case is someone using your Claude quota. Rotate it with `claude setup-token`
-  if you ever suspect that, and keep ideas from the open internet (phase 3) behind your `approved` gate.
+  if you ever suspect that. Ideas come from text on the open internet; with the Autopilot on, your gate becomes a
+  48-hour veto, so read the notifications. The Critic's evidence check, the Reviewer and the monthly cap still stand
+  between a planted idea and a build. Set `AUTOPILOT=notify` to get the human gate back.
 
 ## Label state machine
 
-Each idea issue carries exactly one state label. Two transitions are human gates: you add `approved` and `blueprint-ok`.
+Each idea issue carries exactly one state label. Two transitions are human gates: you add `approved` and `blueprint-ok`
+(or the Autopilot does, after its veto window; `hold` stops it).
 Changes use the same labels from `approved` to `building`, then end as `shipped` instead of `live`.
 
 <img src="../assets/diagrams/states-light.svg" width="960" alt="The label states in order: idea, approved (you), blueprint-ready (Architect), blueprint-ok (you), building (dispatch). While building, the Factory opens a PR, the Inspector reviews it and runs the checks, and on a pass it merges and the Publisher deploys and smoke-tests, which sets live. On a fail the Factory pushes a fix, at most three rounds; then, or when any automated step fails, the issue is stuck. You can move any state to archived.">

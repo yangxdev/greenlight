@@ -1,5 +1,5 @@
 # Ideas: weekly Analyst + Critic. Turns the Scout's signals into at most a few `idea` issues.
-# Nothing here applies "approved": that gate stays human.
+# Nothing here applies "approved". The Autopilot (autopilot.yml) does that later, after a veto window, if it's on.
 #
 #   export   (no AI)         ranked Scout export + titles of existing idea issues
 #   analyst  (AI, no PAT)    clusters signals into idea cards -> analysis/<date>.md
@@ -274,6 +274,8 @@ jobs:
             - analysis/watchlist.md: earlier near misses and the evidence already verified for them
             - analysis/field-notes.md: evidence the owner verified at the source, if the file exists
 
+            Filing threshold: ${{ vars.CRITIC_MIN_SCORE || '12' }}/20.
+
             Write analysis/${{ needs.export.outputs.date }}-critic.md, update analysis/watchlist.md, then return the
             structured result. Do not create or modify any other file.
           claude_args: >-
@@ -333,7 +335,7 @@ jobs:
       USAGE: |-
         ${{ needs.analyst.outputs.usage }}
         ${{ needs.critic.outputs.usage }}
-      MIN_SCORE: ${{ vars.CRITIC_MIN_SCORE || '14' }}
+      MIN_SCORE: ${{ vars.CRITIC_MIN_SCORE || '12' }}
       MAX_IDEAS: ${{ vars.CRITIC_MAX_IDEAS || '3' }}
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -399,7 +401,7 @@ jobs:
               echo
               echo "---"
               echo "_Filed by the Critic from [analysis/${DATE}.md](${analysis_url}). Score **${total}/20** (pain ${pain}, competition ${competition}, build ${mvp}, reach ${reach}), size **${size}**._"
-              echo "_Add \`approved\` to send it to the Architect, or \`archived\` to drop it._"
+              echo "_Add \`approved\` to send it to the Architect, \`hold\` to stop the Autopilot approving it, or \`archived\` to drop it._"
             } >> "$RUNNER_TEMP/body.md"
             url=$(gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label idea --body-file "$RUNNER_TEMP/body.md")
             filed+=("$url")
