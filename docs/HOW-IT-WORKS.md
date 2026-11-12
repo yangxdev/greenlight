@@ -11,7 +11,7 @@ the usage budget and the security model. To run your own copy, see [SETUP.md](SE
    report, today's analysis) already exists. Started by hand, they always run. **Ideas** (`ideas.yml`):
    - `export` (no AI) takes the ranked Scout export (about 200 problem signals), a separate competition file of recent
      Product Hunt launches and new GitHub projects (searched, not read whole), and the existing idea titles;
-   - the **Analyst** (AI, about 20 turns) writes idea cards to `analysis/<date>.md`;
+   - the **Analyst** (AI, up to 35 turns) writes idea cards to `analysis/<date>.md`;
    - the **Critic** (AI, fresh context, about 15 turns) checks the cards' evidence against the signals and scores them
      on the compass rubric, and estimates each card's size (S, M or L) without scoring it. It writes
      `analysis/<date>-critic.md` and returns a JSON verdict. Cards scoring just below the threshold (10–11) go on `analysis/watchlist.md` with
@@ -154,7 +154,7 @@ The Pro plan's usage limits are the real budget:
   the product's code first, `ARCHITECT_CHANGE_MAX_TURNS` (40) and `REVIEWER_CHANGE_MAX_TURNS` (30); `FACTORY_MAX_TURNS` (80),
   `FIX_MAX_TURNS` (40), `INSPECTOR_MAX_TURNS` (25). At most `INSPECTOR_MAX_ROUNDS` (3) fix rounds per PR. Every job also has a `timeout-minutes`.
   Worst case per product is about 1 Architect + 1 blueprint review + 1 build + 4 reviews + 3 fixes.
-- **Weekly idea generation is two short runs:** the Analyst (about 20 turns over about 30k tokens of signals) and the
+- **Weekly idea generation is two short runs:** the Analyst (up to 35 turns over about 40k tokens of signals) and the
   Critic (about 15 turns). With no Scout signals, both are skipped.
 - **The weekly Observer is one short run** (about 12 turns over a small `metrics.json`), and it's skipped while nothing is live.
   `uptime.yml` exits in seconds when MongoDB isn't set or nothing is live. Otherwise it costs about 4 × 1 billed minute a day.
