@@ -29,6 +29,10 @@ on:
         description: Print what it would notify and label, change nothing
         type: boolean
         default: false
+      test_notification:
+        description: Only send one test notification to your phone, then stop
+        type: boolean
+        default: false
 
 # One at a time; a newer pending run replaces an older one, which is fine because every run reconciles everything.
 concurrency:
@@ -69,6 +73,7 @@ jobs:
           AUTOPILOT_NEEDS_OWNER_HOURS: ${{ vars.AUTOPILOT_NEEDS_OWNER_HOURS }}
           AUTOPILOT_MAX_APPROVALS: ${{ vars.AUTOPILOT_MAX_APPROVALS }}
           DRY_RUN: ${{ inputs.dry_run }}
+          TEST_NOTIFICATION: ${{ inputs.test_notification }}
           WORKFLOW_RUN_NAME: ${{ github.event.workflow_run.name }}
           WORKFLOW_RUN_CONCLUSION: ${{ github.event.workflow_run.conclusion }}
           WORKFLOW_RUN_URL: ${{ github.event.workflow_run.html_url }}

@@ -102,7 +102,8 @@ characters), and save that name as the secret `NTFY_TOPIC`. With a self-hosted o
 `NTFY_SERVER` (variable) and `NTFY_TOKEN` (secret). Without `NTFY_TOPIC` the Autopilot does nothing. To get
 notifications but keep both gates yours, set the variable `AUTOPILOT` to `notify`; `off` stops it entirely.
 Its other variables: `AUTOPILOT_IDEA_HOURS` (48), `AUTOPILOT_BLUEPRINT_HOURS` (24), `AUTOPILOT_NEEDS_OWNER_HOURS` (72),
-`AUTOPILOT_MAX_APPROVALS` (2 per 30 days).
+`AUTOPILOT_MAX_APPROVALS` (2 per 30 days). To check the topic reaches your phone: Actions → **Autopilot** →
+*Run workflow* with *Only send one test notification* ticked.
 
 ## 4. Create the labels
 

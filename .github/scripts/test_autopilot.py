@@ -211,6 +211,13 @@ class Helpers(unittest.TestCase):
         self.assertEqual(r.title, "Weekly report 2026-W45")
         self.assertIn("#1 archive", r.message)
 
+    def test_test_notice_says_what_mode_it_is_in(self):
+        n = ap.test_notice("me/greenlight", "notify")
+        self.assertEqual(n.title, "Greenlight test notification")
+        self.assertIn("notify only", n.message)
+        self.assertEqual(n.click, "https://github.com/me/greenlight/actions/workflows/autopilot.yml")
+        self.assertIn("veto windows", ap.test_notice("me/greenlight", "on").message)
+
     def test_defuse_mentions(self):
         self.assertEqual(ap.defuse("@bob"), "@​bob")
 
