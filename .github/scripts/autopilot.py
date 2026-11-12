@@ -418,6 +418,14 @@ def send(server: str, topic: str, token: str, notice: Notice) -> None:
         pass
 
 
+def test_notice(repo: str, mode: str) -> Notice:
+    """What the Actions tab's "Send a test notification" sends: proof the topic reaches the phone."""
+    state = {"on": "on: it approves and builds after the veto windows",
+             "notify": "on notify only: both gates stay yours"}[mode]
+    return Notice("Greenlight test notification", f"If you can read this, ntfy works. The Autopilot is {state}.",
+                  f"https://github.com/{repo}/actions/workflows/autopilot.yml", 3, ["test_tube"])
+
+
 def env_float(name: str, default: float) -> float:
     value = os.environ.get(name, "").strip()
     return float(value) if value else default
@@ -475,6 +483,19 @@ def main() -> int:
     if mode == "on" and not pat:
         print("::warning::No GREENLIGHT_TOKEN secret, so the Autopilot only notifies")
         mode = "notify"
+
+    if env.get("TEST_NOTIFICATION", "").lower() == "true":
+        if not topic:
+            print("::error::No NTFY_TOPIC secret to send the test to")
+            return 1
+        notice = test_notice(repo, mode)
+        try:
+            send(env.get("NTFY_SERVER") or "https://ntfy.sh", topic, env.get("NTFY_TOKEN", ""), notice)
+        except (urllib.error.URLError, TimeoutError) as error:
+            print(f"::error::ntfy refused the test notification: {error}")
+            return 1
+        print("Sent the test notification. Nothing else was checked or changed.")
+        return 0
 
     cfg = Config(repo=repo, owner=owner, mode=mode,
                  idea_hours=env_float("AUTOPILOT_IDEA_HOURS", 48),
