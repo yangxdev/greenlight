@@ -90,7 +90,7 @@ and under Network Access allow `0.0.0.0/0` (GitHub Actions has no fixed IPs). Co
 
 Optional **variables** (same page, *Variables* tab): `PRODUCT_VISIBILITY` (`public`|`private`, default `public`),
 `PRODUCT_PREFIX` (e.g. `gl-`), `ARCHITECT_MAX_TURNS` (20), `REVIEWER_MAX_TURNS` (20), `FACTORY_MAX_TURNS` (80), `FIX_MAX_TURNS` (40),
-`INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (20),
+`INSPECTOR_MAX_TURNS` (25), `INSPECTOR_MAX_ROUNDS` (3), `AUTO_MERGE` (`true`), `ANALYST_MAX_TURNS` (35),
 `CRITIC_MAX_TURNS` (25), `CRITIC_MIN_SCORE` (12), `CRITIC_MAX_IDEAS` (3), `OBSERVER_MAX_TURNS` (12), `CLAUDE_TOKEN_EXPIRES`
 (`YYYY-MM-DD`, for the Observer's expiry warning), and `CLAUDE_MODEL` (passed as `--model`;
 empty uses Claude Code's default for your plan). The Architect copies these into each new product repo, and you can

@@ -188,7 +188,7 @@ jobs:
 
             Output: write analysis/${{ needs.export.outputs.date }}.md. Do not create or modify any other file.
           claude_args: >-
-            --max-turns ${{ vars.ANALYST_MAX_TURNS || '20' }}
+            --max-turns ${{ vars.ANALYST_MAX_TURNS || '35' }}
             ${{ vars.CLAUDE_MODEL && format('--model {0}', vars.CLAUDE_MODEL) || '' }}
             --allowedTools "Read,Write,Edit,Glob,Grep"
 
