@@ -9,15 +9,17 @@ signal being in the current export.
 
 ## skill-shelf
 
-- **Best score:** 13/20 on 2026-09-30 (pain 3, competition 3, MVP 4, reach 3)
-- **Last new evidence:** 2026-09-30
+- **Best score:** 13/20 on 2026-09-30 (pain 3, competition 3, MVP 4, reach 3), size S. Re-scored 11/20 on 2026-11-12 (pain 2, competition 2, build 4, reach 3)
+- **Last new evidence:** 2026-11-12
 - **Problem:** People who use coding agents pile up skill files (SKILL.md and similar) and have no good way to keep
   them organised or know whether they work.
-- **Needs:** more people asking the question itself, in their own words, in a second place; the other threads were
-  adjacent (moving sessions between agents, sharing setups). A check of existing SKILL.md validators and lists.
+- **Needs:** a third independent thread, or replies showing others share the "does my skill work" pain; the September
+  thread is now too old to count as recent. A check of existing SKILL.md validators (Skillbox only overlaps on
+  organising and syncing).
 - **Verified evidence:**
+  - https://news.ycombinator.com/item?id=50426070 (hn ask_hn, 2026-11-09, 23 / 6): "Do you systematically evaluate agent skills, either before or while using them?"
   - https://news.ycombinator.com/item?id=49589914 (hn ask_hn, 2026-09-06, 320 points / 299 comments): "How do you
-    find skills, keep them organised, and make sure they actually work?"
+    find skills, keep them organised, and make sure they actually work?" (older than 60 days on 2026-11-12)
   - https://news.ycombinator.com/item?id=49743049 (hn, 2026-09-17, 68 / 62): "you cannot simply switch between
     agents without starting over" (adjacent)
   - https://news.ycombinator.com/item?id=49740105 (hn show_hn, 2026-09-17, 251 / 140): "Which agents did they use?
@@ -57,6 +59,18 @@ signal being in the current export.
     them)."
   - https://askubuntu.com/questions/1570809/does-my-ubuntu-system-bog-down-because-i-have-inadvertently-parked-my-home-unde
     (stackexchange askubuntu, 2026-11-07, 0 / 0): "I have never really understood partitioning and mount points."
+
+## agent-context-pack
+
+- **Best score:** 11/20 on 2026-11-12 (pain 2, competition 2, build 4, reach 3), size M
+- **Last new evidence:** 2026-11-12
+- **Problem:** People running coding agents across several clients or projects keep re-explaining the same context and
+  rules, because each tool keeps its own memory.
+- **Needs:** a second independent thread, or replies where people describe this pain in their own words. A check of
+  Make0 Brain OSS, Agent Clan and axel.md for setup cost and per-client separation.
+- **Verified evidence:**
+  - https://news.ycombinator.com/item?id=50403153 (hn ask_hn, 2026-11-07, 98 / 60): "The major time cost for me is to re-explaining context and past decisions, client rules, that we already do."
+  - https://news.ycombinator.com/item?id=50444380 (hn ask_hn, 2026-11-10, 36 / 36): "no central notion of behaviour definitions, which causes every bug-fixing session to feel like a game of whack-a-mole" (adjacent)
 
 ## patch-check
 
