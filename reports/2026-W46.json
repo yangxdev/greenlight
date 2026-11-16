@@ -1,0 +1,24 @@
+{
+  "week": "2026-W46",
+  "summary": "W46: all three live products were up (100% uptime from 15/15 probes each; latency 252, 173 and 100 ms). The pipeline was idle: 0 ideas filed, 0 stuck, 3 live. Traffic is measurable only for opt-out-log (#1), which had 0 visits this week and last. Greenlight-status (#5) and agent-spend-cap (#3) still have no Web Analytics site, a gap since W40. The probe count keeps shrinking (28, 21, 16, 15) and is worth checking. Both tokens have more than 300 days left, so no token action is needed.",
+  "products": [
+    {
+      "issue": 5,
+      "verdict": "keep",
+      "reason": "Up with 100% uptime (15/15 probes), home 200, health OK, 252 ms. Its success metric is a GitHub label-timeline measure, not in metrics.json, so there is no data. board.counts shows 0 approved and 0 blueprint-ok, so there is nothing to measure yet.",
+      "suggestion": "Optionally add a Cloudflare Web Analytics site and set CF_BEACON_TOKEN on the repo so traffic becomes visible."
+    },
+    {
+      "issue": 3,
+      "verdict": "improve",
+      "reason": "Up with 100% uptime (15/15), 173 ms. Its 2-week success window has closed with no data because no Web Analytics site exists (traffic is null). The metric also depends on posting links, which compass says the owner does not do.",
+      "suggestion": "Add a Cloudflare Web Analytics site for agent-spend-cap and set its CF_BEACON_TOKEN variable (or map it in observer/config.json) so the 200-visit metric can be measured."
+    },
+    {
+      "issue": 1,
+      "verdict": "archive",
+      "reason": "0 visits and 0 page views this week and last (siteTag configured). It went live 2026-10-02, so under 10 visits in each of the weeks since the 2-week mark. Its own metric says to archive below 100 visits. It is up (100%, 15/15), so the zero looks like a discoverability gap.",
+      "suggestion": "Archive it, or keep it only if you can make it findable by search terms without posting links. Archiving is the owner's decision."
+    }
+  ]
+}
