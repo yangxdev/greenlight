@@ -27,7 +27,7 @@ signal being in the current export.
 
 ## diff-triage
 
-- **Best score:** 13/20 on 2026-10-05 (pain 3, competition 2, MVP 4, reach 4)
+- **Best score:** 13/20 on 2026-10-05 (pain 3, competition 2, MVP 4, reach 4). Re-scored 10/20 on 2026-11-16 (pain 2, competition 2, build 3, reach 3): only the 2026-10-02 thread is still recent, size M
 - **Last new evidence:** 2026-10-05
 - **Problem:** Reviewers get AI-generated pull requests far larger than they can read and no longer understand what
   changed.
@@ -46,7 +46,7 @@ signal being in the current export.
 
 ## fstab-reader
 
-- **Best score:** 12/20 on 2026-11-09 (pain 2, competition 3, build 4, reach 3), size S
+- **Best score:** 12/20 on 2026-11-09 (pain 2, competition 3, build 4, reach 3), size S. Re-scored 11/20 on 2026-11-16 (pain 2, competition 2, build 4, reach 3): free explainers and chatbots already answer this
 - **Last new evidence:** 2026-11-09
 - **Problem:** Newer Ubuntu users and people who inherit machines can't read their own `/etc/fstab` or partition
   layout, so they don't know whether it is right until a disk fills up or the system won't boot.
